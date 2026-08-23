@@ -1,0 +1,7 @@
+{
+  "params": {
+    "base_url": "${env:DAV_TTS_BASE_URL|http://tts:8880}",
+    "voice": "${env:DAV_TTS_VOICE|af_heart}",
+    "sample_rate": 24000
+  }
+}

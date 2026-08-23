@@ -37,7 +37,9 @@ holding with a person talking to the line.
 |---|---|---|---|
 | The image builds on amd64 | 🔴 **not run** | `docker buildx build --platform linux/amd64` | not yet |
 | The image builds on arm64 from the release assets | 🔴 **not run** — and `ctranslate2` may have no aarch64 wheel (`05-ten.md` §8) | `docker buildx build --platform linux/arm64` | not yet |
-| A person speaks and hears an answer | 🔴 **not run** — `das_host`, `das_tools`, `das_bridge` and `local_tts` do not exist | `make up && make call` | not yet |
+| A backend descriptor loads, interpolates its settings, and every way it can be malformed is refused at start-up rather than at run time | 🟢 | `make test` — 15 checks over `das_tools/descriptor.py` | not yet |
+| A pre-rendered phrase and a synthesized one are one code path to everything downstream | 🟢 by construction | `local_tts` serves both through `get()`; no test reaches it without the runtime | not yet |
+| A person speaks and hears an answer | 🔴 **not run** — `das_host` and `das_bridge` do not exist; `das_tools` and `local_tts` do | `make up && make call` | not yet |
 | First audio under 900 ms at p95 | 🔴 **not run** | `make test` (phase 5 of the plan) | not yet |
 | A definitional question is answered without dispatching | 🔴 **not run** | the tiers witness | not yet |
 | A refusal is spoken from a fixed phrase and never paraphrased | 🔴 **not run** | the refusal witness | not yet |

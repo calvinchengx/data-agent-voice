@@ -37,4 +37,15 @@ testpaths = ["tests"]
 omit = [
     "scripts/check_docs_nav.py",
     "scripts/check_links.py",
+    # Modules that import the TEN runtime. It is not a pip package -- it is
+    # installed by `tman` into the image and exists nowhere else (docs/05-ten.md
+    # §7) -- so a unit test cannot import these at all, and a stub of the
+    # runtime would be a test of the stub. What exercises them is the image
+    # build and a running graph, and docs/parity.md records both as not run
+    # rather than letting a number imply otherwise. `descriptor.py` is
+    # deliberately free of that dependency so the rule §16 rests on IS testable.
+    "extensions/*/addon.py",
+    "extensions/*/extension.py",
+    "extensions/local_tts/config.py",
+    "extensions/local_tts/client.py",
 ]

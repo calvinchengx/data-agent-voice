@@ -83,10 +83,10 @@ call: ## Open the browser client against the running line
 	@$(PY) -m webbrowser "http://localhost:$${TEN_API_PORT:-8080}/" >/dev/null 2>&1 || echo "open http://localhost:$${TEN_API_PORT:-8080}/"
 
 test: ## The checks that hold this repo's configuration to itself
-	uv run --with pytest --with pytest-cov python -m pytest -q $(ARGS)
+	uv run --with pytest --with pytest-cov --with pydantic --with httpx python -m pytest -q $(ARGS)
 
 witnesses: ## Record what the suite witnessed, for the badges (--check to verify)
-	uv run --with pytest --with pytest-cov python scripts/witnesses.py $(ARGS)
+	uv run --with pytest --with pytest-cov --with pydantic --with httpx python scripts/witnesses.py $(ARGS)
 
 docs: ## Serve the documentation site locally
 	pnpm install && pnpm run docs:dev

@@ -5,10 +5,10 @@ re-verifies it, so a badge can never advertise a number nobody proved. Same
 convention as the family: the manifest is committed, CI re-runs the suite and
 fails if the recorded figure has drifted.
 
-Coverage is recorded the same way, and is deliberately measured over
-`scripts/` alone. The extensions are not written yet; measuring a package that
-does not exist would report 100% of nothing, which is the badge lying in the
-flattering direction.
+Coverage is measured over `scripts/` and `extensions/` -- the Python this
+repository writes. It deliberately excludes the graph's own runtime paths,
+which no unit test reaches: only a running call does, and docs/parity.md
+records those rows as not run rather than letting a green number imply them.
 """
 
 from __future__ import annotations
@@ -22,13 +22,23 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "docs" / "witnesses.json"
+LANDING = ROOT / "site" / "index.html"
+README = ROOT / "README.md"
 COVERAGE = ROOT / "docs" / "coverage.json"
 TOLERANCE = 0.5
 
 
 def run_suite() -> tuple[int, int, float]:
     proc = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "--cov=scripts", "--cov-report=term"],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-q",
+            "--cov=scripts",
+            "--cov=extensions",
+            "--cov-report=term",
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -44,6 +54,17 @@ def run_suite() -> tuple[int, int, float]:
     total = passed + (int(failed.group(1)) if failed else 0)
     pct = re.search(r"^TOTAL\s+\d+\s+\d+\s+(\d+)%", out, re.M)
     return passed, total, float(pct.group(1)) if pct else 0.0
+
+
+def _restate(page: pathlib.Path, pattern: str, replacement: str, total: int) -> None:
+    """Put the current count into a page that states it in prose."""
+    if not page.exists():
+        return
+    text = page.read_text()
+    new = re.sub(pattern, replacement, text)
+    if new != text:
+        page.write_text(new)
+        print(f"  {page.name}: now states {total}")
 
 
 def main() -> int:
@@ -71,6 +92,20 @@ def main() -> int:
 
     MANIFEST.write_text(json.dumps({"passed": passed, "total": total}, indent=2) + "\n")
     COVERAGE.write_text(json.dumps({"python": pct}, indent=2) + "\n")
+    # The count appears in prose on the two most-read pages, and badges.py
+    # fails the build when it disagrees with the manifest. Writing it here
+    # rather than by hand means the number has one author: editing it by hand
+    # left the page a run behind every time a test was added, which the guard
+    # then reported as drift.
+    _restate(
+        LANDING,
+        r"<b>\d+</b>(<span>(?:end-to-end witnesses|checks on the design))",
+        rf"<b>{total}</b>\1",
+        total,
+    )
+    _restate(
+        README, r"\d+ checks, run by `make test`", f"{total} checks, run by `make test`", total
+    )
     print(f"witnesses: {passed}/{total}, coverage {pct}% → recorded")
     return 0
 

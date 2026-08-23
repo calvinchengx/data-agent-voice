@@ -39,10 +39,10 @@ jobs:
         run: uv run --with ruff ruff format --check .
       - name: The configuration agrees with itself
         if: ${{ !cancelled() }}
-        run: uv run --with pytest --with pytest-cov python -m pytest -q
+        run: uv run --with pytest --with pytest-cov --with pydantic --with httpx python -m pytest -q
       - name: The recorded witness count is the one the suite proves
         if: ${{ !cancelled() }}
-        run: uv run --with pytest --with pytest-cov python scripts/witnesses.py --check
+        run: uv run --with pytest --with pytest-cov --with pydantic --with httpx python scripts/witnesses.py --check
       - name: The sidebar and docs/ agree, on what is committed
         if: ${{ !cancelled() }}
         run: python3 scripts/check_docs_nav.py

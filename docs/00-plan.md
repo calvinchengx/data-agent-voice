@@ -259,17 +259,25 @@ Rows 7–9 are upstream and appear here so the panel can show them and the docs 
 
 | # | Phase | Delivers | Done when | Depends on |
 |---|---|---|---|---|
-| 0 | Stack + witnesses | Compose consuming `data-agent-service` by image with the `ask` profile on; the witness harness; the panel reading timings; `make up` / `make doctor` / `make status` | witnesses run red against the real service | upstream `a9ff497` (landed) |
-| 1 | Tier 0/1 line | TEN graph, host, local speech, catalog lookups; tier 2 says "I can't do that yet" | onset witness green; definitional answers in < 2 s | — |
-| 2 | Tier 2 dispatch | `das_bridge` on the real `/ask` route, milestones, answer rendering, fixed phrases | refusal + abstention + tiers witnesses green | upstream behaviour checks green (a model run) |
-| 3 | Barge-in + cancel | Flush, abort, `cancel` | barge-in witness green | upstream coarse cancellation (landed) |
-| 4 | Switches + panel | Every §10 1–6 switch wired; deltas measured and written into §9 | switches witness green; §9 rewritten with measurements | — |
-| 5 | Entity confirmation | D12 | confirm witness green | — |
+| 0 | Stack + witnesses ✅ | Compose consuming `data-agent-service` by image with the `ask` profile on; the witness harness; the panel reading timings; `make up` / `make doctor` / `make status` | witnesses run red against the real service | upstream `a9ff497` (landed) |
+| 1 | Tier 0/1 line ✅ | TEN graph, host, local speech, catalog lookups; tier 2 says "I can't do that yet" | onset witness green; definitional answers in < 2 s | — |
+| 2 | Tier 2 dispatch | `das_bridge` follows a ticket over SSE, renders milestones and answers, and passes refusals as a kind | **written**; the witnesses need upstream's behaviour checks, which need a model key | a model key |
+| 3 | Barge-in + cancel | Flush to model, voice and wire; in-flight asks cancelled | **written**; the witness is a timing claim only a call can make | a microphone |
+| 4 | Switches + panel ✅ | Every §10 1–6 switch is a setting the graph reads; the panel measures the five spans live and stores nothing | the panel's arithmetic is checked (11 tests through node); **the deltas themselves need a call** | a microphone |
+| 5 | Entity confirmation ✅ | D12: name-shaped words the recogniser was unsure of are flagged to the model, which has `confirm` and decides | the rules are checked (15 tests); **the behaviour needs a call** | a microphone |
 | 6 | Fan-out visible | Branch view in the panel | branches witness green | upstream phase-2 fan-out |
 | 7 | Prod | cloud speech by `.env`; `ENV=prod` run | prod witness green; `parity.md` Azure column | upstream prod |
 | 8 | Telephony | a phone number in front of the same graph | same witnesses over PSTN | external provider |
 
 Phases 0–2 are the demo. 3–5 make it the one described here. 6–8 are new scope.
+
+**Where this actually stands.** Every phase from 0 to 5 is *written*, and the
+parts decidable without a running call are checked — 130 of them. What none of
+them can establish is whether a person can talk to it, because that needs a
+microphone, a model key and a machine with a GPU for switch #1. `parity.md`
+keeps every such row red rather than letting a green suite imply a working
+line. The remaining phases each wait on something this repository cannot
+supply: a key, a tenant, a phone number.
 
 ---
 

@@ -1,0 +1,53 @@
+{
+  "type": "extension",
+  "name": "das_bridge",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "0.11"
+    },
+    {
+      "type": "system",
+      "name": "ten_ai_base",
+      "version": "0.7"
+    }
+  ],
+  "package": {
+    "include": [
+      "manifest.json",
+      "property.json",
+      "**.py",
+      "README.md",
+      "requirements.txt"
+    ]
+  },
+  "api": {
+    "property": {
+      "properties": {
+        "tls_insecure": {
+          "type": "string"
+        }
+      }
+    },
+    "cmd_in": [
+      {
+        "name": "ask_dispatched"
+      },
+      {
+        "name": "ask_cancel"
+      }
+    ],
+    "data_in": [
+      {
+        "name": "session_token"
+      }
+    ],
+    "data_out": [
+      {
+        "name": "agent_turn"
+      }
+    ]
+  }
+}

@@ -86,8 +86,6 @@
               "name": "bridge",
               "addon": "das_bridge",
               "property": {
-                "backends_dir": "/app/agents/analyst_line/tenapp/backends",
-                "backends": "${env:DAV_BACKENDS|data-agent}",
                 "tls_insecure": "${env:DAV_TLS_INSECURE|true}"
               }
             },

@@ -179,6 +179,7 @@ class DasToolsExtension(AsyncLLMToolBaseExtension):
         # The bridge, not the model, follows the stream from here.
         cmd = Cmd.create(CMD_DISPATCHED)
         cmd.set_property_string("backend", backend.name)
+        cmd.set_property_string("base_url", backend.base_url)
         cmd.set_property_string("ticket", ticket)
         cmd.set_property_string("conversation", conversation)
         await ten_env.send_cmd(cmd)

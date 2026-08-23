@@ -60,28 +60,34 @@ jobs:
           echo "compose ok"
 
   image:
-    name: The image builds, on both architectures
-    runs-on: ubuntu-latest
-    # The arm64 leg is assembled from the release assets rather than the
-    # registry, which serves linux/x64 only (docs/05-ten.md §8). It is slow
-    # and it is the one that will break first, so it runs here rather than
-    # being discovered on someone's laptop.
+    name: The image builds (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Native runners per architecture rather than one job emulating the
+          # other. The arm64 leg under QEMU on an amd64 runner took over ten
+          # minutes and was still going; natively it is about four. GitHub
+          # provides arm runners free for public repositories, and the two
+          # legs are genuinely independent -- fail-fast off, so a break in one
+          # still reports the other.
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
-      # Skipped, visibly, until the four extensions the graph names exist: the
+      # Skipped, visibly, until every extension the graph names exists: the
       # build cannot succeed without them, and a job that is red on every push
       # teaches people to stop reading CI. It starts building by itself the
-      # moment the first extension lands, which is when its answer becomes
-      # worth having. docs/parity.md records the build as not run either way.
+      # moment the last one lands.
       #
-      # "Any extension exists" was the wrong question: the build needs EVERY
-      # one the graph names, so a partly-written repository started building
-      # and failed. scripts/image_ready.py asks the precise question and names
-      # what is missing.
-      #
-      # A step rather than a job-level `if`, because `hashFiles` reads the
-      # workspace and at job level is evaluated before checkout -- so it saw
-      # an empty tree and the whole workflow failed to parse the condition.
+      # "Any extension exists" was the wrong question -- the build needs EVERY
+      # one -- and a job-level `if` was the wrong place, because `hashFiles`
+      # reads the workspace and is evaluated before checkout.
       - id: ready
         shell: bash
         run: |
@@ -92,8 +98,6 @@ jobs:
             echo "::notice title=Image not built::$reason — the graph names extensions this repository has not written yet. See docs/parity.md."
           fi
       - if: steps.ready.outputs.build == 'true'
-        uses: docker/setup-qemu-action@v3
-      - if: steps.ready.outputs.build == 'true'
         uses: docker/setup-buildx-action@v3
       - name: Build
         if: steps.ready.outputs.build == 'true'
@@ -101,7 +105,24 @@ jobs:
         with:
           context: .
           file: docker/ten/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+      # The image is only useful if it starts. Three things it needed and did
+      # not announce -- LOG_PATH, a 32-character AGORA_APP_ID, and the Python
+      # dependencies that a `find` over symlinks silently missed -- all built
+      # green and failed here.
+      - name: The server starts and registers the graph
+        if: steps.ready.outputs.build == 'true'
+        shell: bash
+        run: |
+          docker buildx build --platform ${{ matrix.platform }} \
+            -f docker/ten/Dockerfile -t das-voice:ci --load .
+          docker run --rm -d --name ci-smoke -e ANTHROPIC_API_KEY=stub das-voice:ci
+          for i in $(seq 1 30); do
+            docker exec ci-smoke curl -fsS http://localhost:8080/health >/dev/null 2>&1 && break
+            sleep 2
+          done
+          docker exec ci-smoke curl -fsS http://localhost:8080/graphs | tee /dev/stderr | grep -q analyst_line
+          docker rm -f ci-smoke

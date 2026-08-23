@@ -28,7 +28,7 @@ endif
 
 PY ?= $(shell for c in python3.13 python3.12 python3 python py; do if "$$c" -c 'import sys; assert sys.version_info >= (3,12)' >/dev/null 2>&1; then echo "$$c"; break; fi; done)
 
-.PHONY: help doctor up down clean restart status ps logs pull build call test witnesses lint format docs docs-build vendor vendor-check lock
+.PHONY: help doctor up down clean restart status ps logs pull build call test witnesses check lint format docs docs-build vendor vendor-check lock
 
 help: ## Show the available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -104,6 +104,18 @@ docs-build: ## Build the site exactly as the workflow does, into _site/
 
 load: ## N concurrent conversations against the line (ARGS="--conversations 5")
 	$(TOOLS) python -m load.run $(ARGS)
+
+check: ## Everything CI's quality job runs, in the order it runs it
+	# One command, because running a subset locally is how an unformatted
+	# file shipped twice: `ruff check` passes while `ruff format --check`
+	# does not, and only the second is what CI asks.
+	uv run --with ruff ruff check .
+	uv run --with ruff ruff format --check .
+	$(MAKE) --no-print-directory test
+	$(MAKE) --no-print-directory witnesses ARGS=--check
+	$(PY) scripts/check_docs_nav.py
+	@test -f $(ENVFILE) || cp .env.example $(ENVFILE)
+	docker compose config -q && echo "compose ok"
 
 lint: ## Ruff over the extensions and harnesses
 	uv run --with ruff ruff check .

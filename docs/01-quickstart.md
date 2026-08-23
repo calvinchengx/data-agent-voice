@@ -51,22 +51,33 @@ with, and send it as 20 ms frames of 16 kHz mono PCM:
 ```python
 import json, base64, urllib.request, audioop, asyncio, websockets
 
-body = json.dumps({"model": "kokoro", "voice": "af_heart",
-                   "input": "Which support team resolves tickets fastest?",
-                   "response_format": "pcm"}).encode()
-pcm = urllib.request.urlopen(urllib.request.Request(
-    "http://localhost:8880/v1/audio/speech", data=body,
-    headers={"Content-Type": "application/json"})).read()
+body = json.dumps(
+    {
+        "model": "kokoro",
+        "voice": "af_heart",
+        "input": "Which support team resolves tickets fastest?",
+        "response_format": "pcm",
+    }
+).encode()
+pcm = urllib.request.urlopen(
+    urllib.request.Request(
+        "http://localhost:8880/v1/audio/speech",
+        data=body,
+        headers={"Content-Type": "application/json"},
+    )
+).read()
 pcm, _ = audioop.ratecv(pcm, 2, 1, 24000, 16000, None)
-pcm += b"\x00\x00" * 32000        # trailing silence closes the turn
+pcm += b"\x00\x00" * 32000  # trailing silence closes the turn
+
 
 async def ask():
     async with websockets.connect("ws://localhost:8765") as ws:
         for i in range(0, len(pcm), 640):
-            await ws.send(json.dumps({"audio": base64.b64encode(pcm[i:i+640]).decode()}))
+            await ws.send(json.dumps({"audio": base64.b64encode(pcm[i : i + 640]).decode()}))
             await asyncio.sleep(0.02)
         async for raw in ws:
             print(str(raw)[:120])
+
 
 asyncio.run(ask())
 ```

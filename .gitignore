@@ -10,3 +10,5 @@ phrases/*.wav
 _site/
 dist/
 .coverage
+website/src/content/docs/
+website/.astro/

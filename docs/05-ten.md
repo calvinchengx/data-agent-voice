@@ -33,6 +33,14 @@ match `manifest.json` and the node's `addon` field exactly.
 | Base classes: `AsyncASRBaseExtension`, `AsyncTTS2BaseExtension`, `AsyncLLMBaseExtension`, `AsyncLLMToolBaseExtension`, `AsyncExtension` | same; implemented in `ten_ai_base` (registry package) |
 | Property getters return `(value, err)` tuples; no signal handlers in extensions; `.env` read only at container start; Python deps not persisted across restarts; bare `tman install` can delete `bin/worker` | `docs/ai/L1/07_gotchas.md` — all of these will bite, all are documented |
 
+**Language.** Every one of the ~90 extensions at the tag is Python, on
+`ten_runtime_python` + `ten_ai_base`; there is no Go extension in the
+catalogue. A tenapp does carry a `main.go` (~60 lines: load `property.json`,
+start the runtime) and the API server is Go, but both are consumed unchanged.
+Everything this repo authors is Python; Go is not written here. That differs
+from `data-agent-service`, where a Go executor earns 8× throughput — here the
+extensions are I/O glue and the hot path is inside the runtime, which is C.
+
 ## The findings that change the plan
 
 ### 1. TEN is RTC-first on Agora, and that is a cloud account

@@ -159,7 +159,15 @@ class LLMExec:
             request_id=request_id,
             messages=messages,
             streaming=True,
-            parameters={"temperature": 0.7},
+            # No sampling parameters. main_python sends `temperature: 0.7`
+            # here, and the Claude extension strips it only on the adaptive
+            # thinking path -- which 4.5-generation models do not take, so the
+            # value reaches the SDK and every turn fails with
+            # "stream() got an unexpected keyword argument 'temperature'".
+            # The host does not want a temperature anyway: it speaks one or two
+            # short sentences to a fixed policy. THE ONE PATCH in this vendored
+            # tree; see agent/VENDORED.
+            parameters={},
             tools=self.available_tools,
         )
         input_json = llm_input.model_dump()

@@ -17,9 +17,281 @@
             },
             {
               "type": "extension",
-              "name": "vad",
-              "addon": "ten_vad_python",
-              "property": {}
+              "name": "stt",
+              "addon": "whisper_stt_python",
+              "property": {
+                "params": {
+                  "model": "${env:DAV_ASR_MODEL|base}",
+                  "compute_type": "${env:DAV_ASR_COMPUTE|int8}",
+                  "language": "en",
+                  "vad_filter": true
+                }
+              }
+            },
+            {
+              "type": "extension",
+              "name": "host",
+              "addon": "das_host",
+              "property": {
+                "greeting": "Analyst line. What would you like to know?",
+                "eou_mode": "${env:DAV_EOU_MODE|fixed}",
+                "tts_chunk": "${env:DAV_TTS_CHUNK|sentence}",
+                "prerendered_ack": "${env:DAV_PRERENDERED_ACK|true}",
+                "speculative_dispatch": "${env:DAV_SPECULATIVE_DISPATCH|false}",
+                "confirm_entities": "${env:DAV_CONFIRM_ENTITIES|true}"
+              }
+            },
+            {
+              "type": "extension",
+              "name": "llm",
+              "addon": "anthropic_llm2_python",
+              "property": {
+                "api_key": "${env:ANTHROPIC_API_KEY}",
+                "model": "${env:DAV_HOST_MODEL|claude-haiku-4-5}",
+                "effort": "${env:DAV_HOST_EFFORT|low}",
+                "max_tokens": 1024,
+                "thinking_display": "omitted",
+                "refusal_fallback": true,
+                "refusal_message": "I can't answer that one.",
+                "prompt": "You are a voice. You never answer a substantive question from your own knowledge: every one is either a lookup you can make with a tool, or a question you hand to a dispatch tool and acknowledge. Speak one or two short sentences and never read out a list, a table or a long identifier. If you are unsure of a name you heard, call confirm before anything else. The tools you have describe what they are for; use them and nothing else.",
+                "base_url": "${env:DAV_HOST_BASE_URL|}"
+              }
+            },
+            {
+              "type": "extension",
+              "name": "tools",
+              "addon": "das_tools",
+              "property": {
+                "backends_dir": "/app/agents/analyst_line/tenapp/backends",
+                "backends": "${env:DAV_BACKENDS|data-agent}",
+                "tls_insecure": "${env:DAV_TLS_INSECURE|true}"
+              }
+            },
+            {
+              "type": "extension",
+              "name": "bridge",
+              "addon": "das_bridge",
+              "property": {
+                "tls_insecure": "${env:DAV_TLS_INSECURE|true}"
+              }
+            },
+            {
+              "type": "extension",
+              "name": "tts",
+              "addon": "local_tts",
+              "property": {
+                "params": {
+                  "base_url": "${env:DAV_TTS_BASE_URL|http://tts:8880}",
+                  "voice": "${env:DAV_TTS_VOICE|af_heart}",
+                  "sample_rate": 24000
+                },
+                "phrases_dir": "/app/agents/analyst_line/tenapp/phrases"
+              }
+            }
+          ],
+          "connections": [
+            {
+              "extension": "transport",
+              "audio_frame": [
+                {
+                  "name": "pcm_frame",
+                  "dest": [
+                    {
+                      "extension": "stt"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "stt",
+              "data": [
+                {
+                  "name": "asr_result",
+                  "dest": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "host",
+              "cmd": [
+                {
+                  "names": [
+                    "tool_register"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "llm"
+                    }
+                  ]
+                },
+                {
+                  "names": [
+                    "flush"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "llm"
+                    },
+                    {
+                      "extension": "tts"
+                    },
+                    {
+                      "extension": "transport"
+                    }
+                  ]
+                },
+                {
+                  "names": [
+                    "ask_cancel"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "bridge"
+                    }
+                  ]
+                }
+              ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "llm"
+                    }
+                  ]
+                },
+                {
+                  "name": "tts_text_input",
+                  "dest": [
+                    {
+                      "extension": "tts"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "llm",
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                }
+              ],
+              "cmd": [
+                {
+                  "names": [
+                    "tool_call"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "tools"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "tools",
+              "cmd": [
+                {
+                  "names": [
+                    "tool_register"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                },
+                {
+                  "names": [
+                    "ask_dispatched"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "host"
+                    },
+                    {
+                      "extension": "bridge"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "bridge",
+              "data": [
+                {
+                  "name": "agent_turn",
+                  "dest": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                }
+              ],
+              "cmd": [
+                {
+                  "names": [
+                    "ask_cancel"
+                  ],
+                  "source": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "tts",
+              "audio_frame": [
+                {
+                  "name": "pcm_frame",
+                  "dest": [
+                    {
+                      "extension": "transport"
+                    }
+                  ]
+                }
+              ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "transport"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "analyst_line_semantic",
+        "auto_start": false,
+        "graph": {
+          "nodes": [
+            {
+              "type": "extension",
+              "name": "transport",
+              "addon": "websocket_server",
+              "property": {
+                "host": "0.0.0.0",
+                "port": 8765
+              }
             },
             {
               "type": "extension",
@@ -68,7 +340,8 @@
                 "thinking_display": "omitted",
                 "refusal_fallback": true,
                 "refusal_message": "I can't answer that one.",
-                "prompt": "You are a voice. You never answer a substantive question from your own knowledge: every one is either a lookup you can make with a tool, or a question you hand to a dispatch tool and acknowledge. Speak one or two short sentences and never read out a list, a table or a long identifier. If you are unsure of a name you heard, call confirm before anything else. The tools you have describe what they are for; use them and nothing else."
+                "prompt": "You are a voice. You never answer a substantive question from your own knowledge: every one is either a lookup you can make with a tool, or a question you hand to a dispatch tool and acknowledge. Speak one or two short sentences and never read out a list, a table or a long identifier. If you are unsure of a name you heard, call confirm before anything else. The tools you have describe what they are for; use them and nothing else.",
+                "base_url": "${env:DAV_HOST_BASE_URL|}"
               }
             },
             {
@@ -111,23 +384,7 @@
                   "name": "pcm_frame",
                   "dest": [
                     {
-                      "extension": "vad"
-                    },
-                    {
                       "extension": "stt"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "extension": "vad",
-              "data": [
-                {
-                  "name": "vad_result",
-                  "dest": [
-                    {
-                      "extension": "host"
                     }
                   ]
                 }

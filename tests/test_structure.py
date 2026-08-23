@@ -226,3 +226,13 @@ def test_the_image_gate_agrees_with_what_is_written():
     ready.loader.exec_module(module)
     written = {n for n in OURS if (ROOT / "extensions" / n / "manifest.json").is_file()}
     assert (module.main() == 0) == (written == OURS)
+
+
+@pytest.mark.parametrize("name", sorted(OURS))
+def test_an_extension_registers_its_addon_on_import(name):
+    """An empty `__init__.py` leaves an extension present on disk, structurally
+    identical to a working one, and invisible to the runtime: "Failed to load
+    the addon using all addon loaders" with no traceback, because nothing was
+    ever imported to fail. Cost an hour to find once."""
+    init = (ROOT / "extensions" / name / "__init__.py").read_text()
+    assert "from . import addon" in init, name

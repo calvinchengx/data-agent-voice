@@ -23,7 +23,11 @@ services:
       args:
         TEN_VERSION: ${TEN_VERSION:-0.11.71}
         TEN_BUILD_IMAGE_VERSION: ${TEN_BUILD_IMAGE_VERSION:-0.7.14}
-    platform: linux/amd64
+    # No `platform:` pin. The Dockerfile has a native leg for both
+    # architectures (docs/05-ten.md §8), so pinning amd64 here would run the
+    # arm64 work under emulation and never exercise it -- which is exactly
+    # what it did, silently, until a container reported x86_64 library paths
+    # on an arm64 host.
     env_file: ${ENVFILE:-.env}
     environment:
       SERVER_PORT: "8080"

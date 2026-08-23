@@ -42,7 +42,10 @@ holding with a person talking to the line.
 | A pre-rendered phrase and a synthesized one are one code path to everything downstream | 🟢 by construction | `local_tts` serves both through `get()`; no test reaches it without the runtime | not yet |
 | Everything the caller hears leaves through one path, so there is never a second speaker with no arbiter | 🟢 structurally | `make test` — one `tts_text_input` send in `das_host` | not yet |
 | A refusal, an abstention and an error each have their own fixed phrase, and the refusal does not sound like missing data | 🟢 | `make test` — 8 checks over the host's policy | not yet |
-| A person speaks and hears an answer | 🔴 **not run** — all four extensions exist and the image runs; no audio has been through it | `make up && make call` | not yet |
+| Speech reaches the graph, is recognised, and a final transcript reaches the host | 🟢 **run** — 2.7 s of synthesized speech in, `is_final` transcripts out, on arm64 | `make up`, then feed PCM to the WebSocket | not yet |
+| Every extension in the graph loads and the session stays up | 🟢 **run** — all seven nodes, `/list` shows the session alive | `make up` and `POST /start` | not yet |
+| The host takes the turn and calls the model | 🟠 **partly** — the call is made and fails against the `llm-stub`, which answers plain JSON where the SDK streams. The stub cannot stand in for a model here | needs `ANTHROPIC_API_KEY` | not yet |
+| A person speaks and **hears an answer** | 🔴 **not run** — everything up to the model is proven; TTS has never been reached | `make up && make call` with a key | not yet |
 | The panel's arithmetic is right: p95 by nearest rank, a span needs both marks, the first mark wins, and an unmeasured phase reads as nothing rather than zero | 🟢 | `make test` — 11 checks run through node | not yet |
 | The panel stores nothing — no transcript, no question, no audio | 🟢 | `make test` — the page uses no storage API | not yet |
 | A mis-transcribed entity produces a confirmation, not a dispatch | 🟢 the decision; 🔴 the call | `make test` — 15 checks over the uncertainty rules | not yet |

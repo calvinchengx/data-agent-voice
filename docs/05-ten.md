@@ -239,6 +239,10 @@ settled by building them:**
   `AGORA_APP_ID` is **exactly 32 characters** even for a graph with no RTC
   node at all. `upstream-issues.md` 1.
 
+**`ten_vad` is x86-only on Linux**, and one unsupported node fails the whole
+graph — so the VAD node is gone from both graphs and `whisper_stt_python`'s
+own `vad_filter` does the job instead. `upstream-issues.md` 6.
+
 The server starts on arm64 and registers the graph:
 
 ```

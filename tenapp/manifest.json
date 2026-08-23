@@ -3,19 +3,40 @@
   "name": "analyst_line",
   "version": "0.1.0",
   "dependencies": [
-    { "type": "system", "name": "ten_runtime_go", "version": "0.11" },
-    { "type": "system", "name": "ten_ai_base", "version": "0.7" },
-
-    { "path": "../../ten_packages/extension/websocket_server" },
-    { "path": "../../ten_packages/extension/whisper_stt_python" },
-    { "path": "../../ten_packages/extension/anthropic_llm2_python" },
-    { "path": "../../ten_packages/extension/ten_vad_python" },
-    { "path": "../../ten_packages/extension/ten_turn_detection" },
-
-    { "path": "../../ten_packages/extension/das_host" },
-    { "path": "../../ten_packages/extension/das_tools" },
-    { "path": "../../ten_packages/extension/das_bridge" },
-    { "path": "../../ten_packages/extension/local_tts" }
+    {
+      "type": "system",
+      "name": "ten_runtime_go",
+      "version": "0.11"
+    },
+    {
+      "type": "system",
+      "name": "ten_ai_base",
+      "version": "0.7"
+    },
+    {
+      "path": "../../ten_packages/extension/websocket_server"
+    },
+    {
+      "path": "../../ten_packages/extension/whisper_stt_python"
+    },
+    {
+      "path": "../../ten_packages/extension/anthropic_llm2_python"
+    },
+    {
+      "path": "../../ten_packages/extension/ten_turn_detection"
+    },
+    {
+      "path": "../../ten_packages/extension/das_host"
+    },
+    {
+      "path": "../../ten_packages/extension/das_tools"
+    },
+    {
+      "path": "../../ten_packages/extension/das_bridge"
+    },
+    {
+      "path": "../../ten_packages/extension/local_tts"
+    }
   ],
   "scripts": {
     "start": "python3 scripts/start.py"

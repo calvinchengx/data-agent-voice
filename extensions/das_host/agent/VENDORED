@@ -8,5 +8,15 @@ node, sentence splitting, and the send helpers. None of it knows anything about
 tiers, backends or this project, so it is taken rather than rewritten and it is
 excluded from ruff for the reason docs/05-ten.md §7 gives.
 
-The fork is extension.py, which replaces main_python's own. No patch here. If
-one becomes necessary it is an upstream PR first, and this file records it.
+The fork is extension.py, which replaces main_python's own.
+
+ONE PATCH, in llm_exec.py: `parameters={"temperature": 0.7}` becomes
+`parameters={}`. The Claude extension strips sampling parameters only on the
+adaptive-thinking path, which 4.5-generation models do not take -- so with the
+host model this plan chose (Haiku 4.5, D4) the value reaches the SDK and every
+single turn fails with:
+
+    RuntimeError: CreateMessage failed, err:
+    AsyncMessages.stream() got an unexpected keyword argument 'temperature'
+
+Found by running the line, not by reading it. docs/upstream-issues.md 7.

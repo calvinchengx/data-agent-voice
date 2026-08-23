@@ -93,3 +93,116 @@ is unchanged.
 
 **Proposed fix.** Build the arm64 release binaries against the same glibc as
 the published build image, or publish the minimum required version.
+
+
+---
+
+## 4. The Python addon loader looks for `libpython3.10` by name
+
+**Project** TEN framework · **Version** 0.11.71 · **Status** worked around
+
+**Observed.** On a 24.04 image (Python 3.12) every worker exits 250:
+
+```
+Failed to dlopen libpython3.10.so: cannot open shared object file
+[Python addon loader] Failed to load Python libraries. Cannot continue.
+```
+
+**Expected.** The loader to find the interpreter it is running under. It does
+name the escape hatch — `TEN_PYTHON_LIB_PATH` — which is good; what is not
+documented is that the value is a **single file path**, not a search path. A
+colon-separated list is `dlopen`ed verbatim and fails reporting the whole
+string as a filename.
+
+**Meanwhile.** The image symlinks the real library to one fixed path and points
+the variable at it, so one value is right on both architectures.
+
+**Proposed fix.** Derive the library name from the running interpreter, and say
+in the error that the variable takes a file.
+
+---
+
+## 5. `ten_ai_base` imports `aiofiles` without declaring it
+
+**Project** TEN framework · **Version** 0.11.71 · **Status** worked around
+
+**Observed.** `whisper_stt_python` fails at instance creation:
+
+```
+ModuleNotFoundError: No module named 'aiofiles'
+  File ".../whisper_stt_python/addon.py", line 12, in on_create_instance
+```
+
+Its `requirements.txt` lists `faster-whisper`, `numpy`, `pydantic`, `pytest` —
+no `aiofiles`. Across the whole catalogue only `soniox_asr_python` declares it,
+so every other ASR extension works or fails depending on what else happened to
+be installed alongside it.
+
+**Expected.** A dependency of the base class to be declared by the base class.
+
+**Meanwhile.** The image installs `aiofiles` explicitly and asserts the import
+at build time. The failure is otherwise invisible until a session starts, which
+is after `/start` has answered 200.
+
+**Proposed fix.** Declare it in `ten_ai_base`.
+
+
+---
+
+## 6. `ten_vad` has no Linux aarch64 build
+
+**Project** TEN VAD (via `ten_vad_python`) · **Version** as pinned at 0.11.71 ·
+**Status** routed around
+
+**Observed.** The extension registers, then dies in `on_start`:
+
+```
+NotImplementedError: Unsupported platform: Linux aarch64
+  ten_vad/__init__.py, line 72
+```
+
+The whole graph fails with it, so a single unsupported node makes the entire
+line unstartable on arm64 — everything else in this repository runs there
+natively.
+
+**Expected.** Either an aarch64 build, or a node that degrades rather than
+raising. The library is a small signal-processing routine, not something with
+an architectural reason to be x86-only.
+
+**Meanwhile.** The node is gone from both graphs. `whisper_stt_python` already
+runs `vad_filter=True` with its own silence parameters
+(`whisper_client.py:136`), so voice activity detection still happens — it
+happens inside the recogniser instead of in front of it. What is lost is a
+separately tunable VAD, which switch #1's "fixed" mode did not use anyway.
+
+**Proposed fix.** Publish an aarch64 wheel.
+
+
+---
+
+## 7. `main_python` sends `temperature`, and the Claude extension only strips it on the thinking path
+
+**Project** TEN framework · **Version** 0.11.71 · **Status** patched in the fork
+
+**Observed.** Every turn fails:
+
+```
+RuntimeError: CreateMessage failed, err:
+AsyncMessages.stream() got an unexpected keyword argument 'temperature'
+```
+
+**Why the two halves miss each other.** `main_python/agent/llm_exec.py:162`
+sends `parameters={"temperature": 0.7}` on every turn.
+`anthropic_llm2_python/anthropic_llm.py:431` drops sampling parameters — but
+only `if thinking_enabled`, and adaptive thinking is added only for
+4.6-generation models and later. So the combination that fails is
+**`main_python` + `anthropic_llm2_python` + any 4.5-generation model**, which
+is exactly what a latency-conscious voice agent would choose for its host: the
+extension's own comment names `main_python` as the source of the value, so
+both halves knew about each other and neither covers this case.
+
+**Meanwhile.** The fork sends no sampling parameters. The host speaks one or
+two short sentences to a fixed policy and wants no temperature.
+
+**Proposed fix.** Strip sampling parameters whenever the SDK rejects them, not
+only when thinking is on — or stop sending them from `main_python`.

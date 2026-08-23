@@ -9,6 +9,7 @@ asserted to be an error at start-up rather than a surprise at run time.
 
 from __future__ import annotations
 
+import importlib.machinery
 import importlib.util
 import json
 import pathlib
@@ -31,13 +32,15 @@ def _load_module(name: str, path: pathlib.Path):
     """
     package = "das_tools"
     if package not in sys.modules:
-        spec = importlib.util.spec_from_file_location(
-            package, ROOT / "extensions" / package / "__init__.py"
+        # A bare module object with a __path__, NOT the real package: its
+        # __init__.py now imports the addon (which is what registers the
+        # extension with the runtime), and the runtime is not installed here.
+        # Executing it would fail collection for every test in this file.
+        module = importlib.util.module_from_spec(
+            importlib.machinery.ModuleSpec(package, None, is_package=True)
         )
-        module = importlib.util.module_from_spec(spec)
         module.__path__ = [str(ROOT / "extensions" / package)]
         sys.modules[package] = module
-        spec.loader.exec_module(module)
     full = f"{package}.{name}"
     spec = importlib.util.spec_from_file_location(full, path)
     module = importlib.util.module_from_spec(spec)

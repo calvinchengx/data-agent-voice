@@ -121,14 +121,43 @@ RUN set -eux; \
     test -n "$reqs"; \
     echo "$reqs" | wc -l; \
     for r in $reqs; do pip3 install --no-cache-dir $PIP_FLAGS -r "$r"; done; \
+    # Not every extension declares its dependencies in requirements.txt --
+    # ten_turn_detection uses pyproject.toml and needs `openai`, which a
+    # requirements-only sweep misses entirely.
+    for t in $(find -L ten_packages/extension -maxdepth 2 -name pyproject.toml); do \
+      pip3 install --no-cache-dir $PIP_FLAGS "$(dirname "$t")" || true; \
+    done; \
     python3 -c "import ctranslate2, faster_whisper, httpx, anthropic"
+
+# Undeclared and unreachable dependencies. `ten_ai_base` imports aiofiles and
+# only one ASR extension in the catalogue happens to list it, so an extension
+# whose own requirements do not is fine at build time and fails at instance
+# creation -- after /start has answered 200. `ten_turn_detection` needs openai
+# and declares it in pyproject.toml, which a requirements.txt sweep never sees.
+# docs/upstream-issues.md 5.
+RUN pip3 install --no-cache-dir $PIP_FLAGS aiofiles openai \
+ && python3 -c "import aiofiles, openai"
 
 # The Go API server: /start spawns one worker per session.
 WORKDIR /app/server
 RUN go build -o bin/api ./cmd/api 2>/dev/null || go build -o bin/api .
 
 # Package what the runtime image needs.
+# The app binary. `tman install` fetches the runtime and the extensions, and
+# the API server is a separate program -- neither produces this. The worker the
+# server spawns is `tenapp/bin/main`, built from the tenapp's own main.go, and
+# without it every session dies with "bin/main not found" AFTER /start has
+# already answered 200. Asserted here so a missing binary fails the build.
 WORKDIR /app/agents/analyst_line/tenapp
+# cgo has to be told where the runtime is. `tman install` puts
+# libten_runtime_go.a and libten_runtime.so under ten_packages/system/, and
+# nothing sets CGO_LDFLAGS for them -- so a bare `go build` fails at link with
+# a page of undefined references to ten_go_*, which reads as a broken module
+# rather than a missing -L.
+ENV LIBS=/app/agents/analyst_line/tenapp/ten_packages/system
+RUN CGO_LDFLAGS="-L$LIBS/ten_runtime_go/lib -L$LIBS/ten_runtime/lib -lten_runtime_go -lten_runtime -lten_utils -Wl,-rpath,\$ORIGIN/../ten_packages/system/ten_runtime/lib" \
+    go build -o bin/main . \
+ && test -x bin/main
 RUN tman package --output-path /tmp/app.tar 2>/dev/null || true
 
 # --------------------------------------------------------------- runtime --
@@ -150,6 +179,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libasound2t64 libgstreamer1.0-dev libunwind-dev libc++1 libssl-dev \
       python3 python3-pip python3-venv ca-certificates curl jq \
+      libpython3.12 \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -165,11 +195,26 @@ RUN ldconfig
 # "mkdir : no such file or directory" when it is unset, which names the
 # symptom and not the cause. Set here so the image runs on its own rather
 # than only under this repository's compose file.
+# TEN_PYTHON_LIB_PATH because the Python addon loader looks for
+# `libpython3.10.so` by name and this image is 24.04, which ships 3.12. The
+# loader says so itself and names the variable; without it every worker exits
+# 250 with "Cannot continue" and the session dies AFTER /start answered 200.
+#
+# The value is a FILE, not a search path -- a colon-separated list is dlopened
+# verbatim and fails naming itself. The symlink below gives one path that is
+# right on both architectures. docs/upstream-issues.md 4.
+#
 # AGORA_APP_ID is validated at start-up whether or not a graph contains an
 # `agora_rtc` node, and this one does not -- the transport is
 # `websocket_server` (docs/05-ten.md §1). The check is `len() != 32` and
 # nothing else, so the placeholder is exactly 32 characters and says what it
 # is. Nothing reads it. Written up in docs/upstream-issues.md.
+# One fixed path to the real library, whatever the architecture calls its
+# multiarch directory.
+RUN set -eux; \
+    lib=$(find /usr/lib -name "libpython3.12.so.1.0" | head -1); \
+    test -n "$lib"; \
+    ln -sf "$lib" /usr/lib/libpython-for-ten.so
 RUN mkdir -p /app/log
 ENV HF_HOME=/root/.cache/huggingface \
     PYTHONUNBUFFERED=1 \
@@ -178,7 +223,8 @@ ENV HF_HOME=/root/.cache/huggingface \
     WORKERS_MAX=10 \
     WORKER_QUIT_TIMEOUT_SECONDS=120 \
     SERVER_PORT=8080 \
-    AGORA_APP_ID=noagorartcnodeinthisgraph0000000
+    AGORA_APP_ID=noagorartcnodeinthisgraph0000000 \
+    TEN_PYTHON_LIB_PATH=/usr/lib/libpython-for-ten.so
 
 EXPOSE 8080 8765
 HEALTHCHECK --interval=10s --timeout=5s --retries=18 --start-period=30s \

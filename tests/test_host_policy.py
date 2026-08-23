@@ -9,6 +9,7 @@ the ones that would fail silently.
 
 from __future__ import annotations
 
+import importlib.machinery
 import importlib.util
 import pathlib
 import sys
@@ -21,13 +22,15 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 def _load(name: str, path: pathlib.Path):
     package = "das_host"
     if package not in sys.modules:
-        spec = importlib.util.spec_from_file_location(
-            package, ROOT / "extensions" / package / "__init__.py"
+        # A bare module object with a __path__, NOT the real package: its
+        # __init__.py now imports the addon (which is what registers the
+        # extension with the runtime), and the runtime is not installed here.
+        # Executing it would fail collection for every test in this file.
+        module = importlib.util.module_from_spec(
+            importlib.machinery.ModuleSpec(package, None, is_package=True)
         )
-        module = importlib.util.module_from_spec(spec)
         module.__path__ = [str(ROOT / "extensions" / package)]
         sys.modules[package] = module
-        spec.loader.exec_module(module)
     spec = importlib.util.spec_from_file_location(f"{package}.{name}", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[f"{package}.{name}"] = module

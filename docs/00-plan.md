@@ -272,7 +272,17 @@ Rows 7–9 are upstream and appear here so the panel can show them and the docs 
 Phases 0–2 are the demo. 3–5 make it the one described here. 6–8 are new scope.
 
 **Where this actually stands.** Every phase from 0 to 5 is *written*, and the
-parts decidable without a running call are checked — 130 of them. What none of
+parts decidable without a running call are checked. The line has also been
+**run**: a session starts, all seven nodes load, 2.7 seconds of synthesized
+speech goes in over the WebSocket and comes back out as final transcripts, on
+arm64, natively. Seven upstream defects were found doing that and none of them
+by reading — they are in `upstream-issues.md`.
+
+What stops there is the model. The upstream `llm-stub` answers plain JSON and
+the Claude extension streams, so the host's very first call fails against it:
+a stub cannot stand in for a model on a streaming path. Everything from the
+model onward — an answer, a spoken reply, a tier, a dispatch — needs a real
+key. What none of
 them can establish is whether a person can talk to it, because that needs a
 microphone, a model key and a machine with a GPU for switch #1. `parity.md`
 keeps every such row red rather than letting a green suite imply a working

@@ -1,6 +1,6 @@
 # Data Agent Voice — Architecture & Implementation Plan
 
-Status: **DRAFT for review — no implementation started.** Last updated 2026-08-23 (TEN pinned at 0.11.71 — see `docs/05-ten.md`; D4, D5, D10, D11, §2, §5, §9, §10 revised).
+Status: **DRAFT for review — no implementation started.** Last updated 2026-08-23 (TEN pinned at 0.11.71 — see `docs/05-ten.md`; §16 added: backends are configuration, not code).
 
 Repo: `~/calvinchengx/emulators/data-agent-voice` · Family tier: **leaf / consumer** — it consumes `data-agent-service`, which consumes the emulators; it emulates nothing · License: Apache-2.0 · Product name inside the repo: **the Analyst Line**.
 
@@ -110,6 +110,7 @@ Everything in the data path — identity, guards, authorization, audit — is up
 | D9 | Refusal and abstention | **Fixed phrases bound to the event type; the host never sees them as text to rewrite** | Criterion 5. A refusal smoothed into prose is the failure upstream exists to prevent |
 | D10 | TEN placement | **Thin extensions speaking HTTP/SSE to the ask service**: `das_host` is a fork of TEN's own `main_python`; `dispatch`/`glossary_lookup`/`confirm` are tool extensions; `das_bridge` injects agent-initiated turns | Confirmed at the tag: this is the shape TEN wants for external systems. `mcp_client_python` exists and **must not** be on the host — it would hand `run_query` to the conversational model |
 | D11 | Transport | **Browser over `websocket_server` first** (local, no account); **Agora RTC by `.env` for prod**; telephony via the SIP examples later | TEN is RTC-first on Agora and has no local WebRTC. WebSocket gives up Opus/FEC/UDP and keeps a laptop demo and a CI that runs |
+| D13 | Backends | **A backend is a descriptor, not a code path.** This repo knows *kinds* of capability — a fast lookup, a dispatch, a terminal outcome — and never a capability's name. `data-agent-service` is the first descriptor, not the only shape supported | §16. The cost of this is near zero while nothing is written and a rewrite once four extensions hardcode one backend |
 | D12 | Entity confirmation | **Confirm before dispatch when the entity is high-stakes or ASR confidence is low** | ASR sits upstream of every guard; a correct query about the wrong team passes every check |
 
 ---
@@ -120,7 +121,7 @@ Everything in the data path — identity, guards, authorization, audit — is up
 |---|---|---|---|
 | `graph/` | The TEN graph definition: VAD, ASR, EOU, host, TTS, bridge, their wiring | TEN manifest / JSON | Stock extensions pinned; two custom |
 | `extensions/das_host/` | Fork of TEN's `main_python`: tier policy, dispatch path, fixed-phrase bypass, pre-rendered acks; sentence chunking and flush are inherited | Python | the host's LLM is a separate `anthropic_llm2_python` node |
-| `extensions/das_tools/` | `glossary_lookup`, `dispatch`, `confirm` as LLM tools (`AsyncLLMToolBaseExtension`) | Python | the only tools the host's LLM ever sees |
+| `extensions/das_tools/` | A loader: one LLM tool per `fast_tool` each backend declares, plus one dispatch per backend, plus `confirm` | Python | the only tools the host's LLM ever sees (§16) |
 | `extensions/local_tts/` | `AsyncTTS2HttpExtension` over a local Piper/Kokoro server; serves pre-rendered phrases by match | Python | D5; upstream candidate |
 | `extensions/vendor/` | Extensions copied from the tag, with a `VENDORED` file naming it and every patch an upstream PR | — | `05-ten.md` §7 |
 | `extensions/das_bridge/` | SSE client to the ask service; renders milestones; injects agent-initiated turns; cancels on barge-in | Python | Speaks `events.schema.json`; validates every event |
@@ -299,6 +300,7 @@ data-agent-voice/
   extensions/      das_host/  das_bridge/
   phrases/         fixed phrases + pre-rendered audio (built, not committed)
   speech/          local + cloud adapters
+  backends/        one descriptor per service the line can talk to (§16)
   identity/        sign-in, session token
   panel/           the instrument panel
   e2e/             witnesses
@@ -321,3 +323,90 @@ Proposed in `data-agent-service`, not built here, each one passing the "would a 
 | A rate tier for an application role, or schema front-loading before fan-out | Any client that asks more than one question a minute |
 
 Nothing else. In particular, no length caps, no tier policy, no rendered text, no speech-shaped field in any event.
+
+---
+
+## 16. Backends are configuration
+
+The line talks to `data-agent-service` today. It should talk to a second
+service — a ticketing agent, an ops agent, or a new surface `data-agent-service`
+itself grows — without a code change here. That is cheap to arrange now,
+because none of the four extensions exist yet, and expensive once they do.
+
+**Most of the coupling was already gone.** The ask contract was deliberately
+stripped of anything voice-shaped, and a contract that is not voice-shaped
+turns out not to be warehouse-shaped either. `das_bridge` handles
+`accepted`/`branch`/`step`/`milestone`/`answer`/`abstention`/`refusal`/`error`/`done`
+and none of those name a warehouse. The tier policy — answer, look up,
+dispatch — is about latency, not about data. What was coupled was small and
+specific:
+
+| Was | Now |
+|---|---|
+| `glossary_lookup` as *the* fast tool, in `das_tools` | one tool per `fast_tool` a backend declares |
+| `om_mcp_path` wired into the graph | a field in the backend's descriptor |
+| `path: catalog\|warehouse\|multi` | **amended upstream** to `{speed, detail}`; policy keys on `speed` |
+| `definitions_applied` | **amended upstream** to `provenance` — `{term, statement, source, kind}` |
+| one backend, one audience, in `.env` | `DAV_BACKENDS=data-agent,…`, one descriptor each |
+
+Both amendments landed in `data-agent-service` while the contract had one
+consumer and no released client. That was the whole reason to do it now.
+
+### The descriptor
+
+```json
+// backends/data-agent.json
+{
+  "name": "data-agent",
+  "display": "your data",
+  "base_url": "${DAV_APIM_BASE}/ask",
+  "audience": "api://data-agent-service",
+  "contract_version": "1",
+  "fast_tools": [
+    { "name": "glossary_lookup",
+      "description": "What a business term means, from the catalog.",
+      "call": { "path": "/om/mcp", "tool": "search_metadata" },
+      "budget_ms": 400 }
+  ],
+  "dispatch": {
+    "tool": "ask_data",
+    "description": "Any question about numbers, tables, metrics or reports."
+  },
+  "phrases": "phrases/data-agent/"
+}
+```
+
+Four consequences, none of which is extra machinery:
+
+* **`das_tools` becomes a loader.** It registers one LLM tool per declared
+  `fast_tool` plus one dispatch per backend, and holds no tool of its own.
+* **Routing is free.** With N backends there are N dispatch tools with
+  distinct descriptions and the host's model picks between them in the same
+  turn. No router, no added latency — that is what tool descriptions are for.
+* **Tier 1 stops meaning "the catalog".** It means *any declared fast tool
+  whose `budget_ms` fits the conversational budget*. `glossary_lookup` is one
+  service's instance of a general thing.
+* **`das_bridge` takes a backend, not a base URL** — a map of ticket to
+  backend rather than a singleton. It already speaks a neutral contract.
+
+Phrases are `phrases/default/` with `phrases/<backend>/` overriding only where
+a backend's refusal genuinely reads differently. Identity is per descriptor:
+`audience` names what the sign-in acquires a token for.
+
+### What is deliberately not generalized
+
+* **The tier policy.** Three tiers is the design, not a plugin point. A
+  backend needing a fourth is a change to this plan.
+* **Speech, transport, models.** Already `.env`; a second mechanism would be
+  worse than the first.
+* **A capability *discovery* endpoint** — `GET /ask/v1/capabilities`, so a new
+  surface in a backend appears here with no file edit at all. That is the
+  strongest version and it waits for a real second backend. Static descriptors
+  already buy the decoupling; discovery only removes a file edit, and it costs
+  an upstream contract addition that cannot be validated against one case.
+
+### The test
+
+The rule that has been working — *would a Slack bot want this?* — extended by
+**would a ticketing agent want this?** Anything in this repo that mentions a
+warehouse, a catalog or SQL is in the wrong repo or the wrong layer.

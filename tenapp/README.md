@@ -34,11 +34,17 @@ runtime, and nothing in this repo is written in Go.
   here, looked up, or dispatched.
 * **llm** — `anthropic_llm2_python`, the host's model. Sees exactly three
   tools and no others.
-* **tools** — `glossary_lookup`, `dispatch`, `confirm`. Registers them with
-  the host at start; the host forwards the registration to the model.
-* **bridge** — `das_bridge`, the SSE client on the ask service. Turns
-  `milestone` and `answer` events into speech, and `refusal` / `abstention`
-  into fixed phrases that the model never sees.
+* **tools** — a loader, not a fixed set. It reads the backend descriptors in
+  `backends/` and registers one LLM tool per declared fast lookup plus one
+  dispatch per backend, alongside `confirm`. With one backend that is
+  `glossary_lookup`, `ask_data` and `confirm`; with two it is however many
+  they declare, and the model routes between the dispatch tools by their
+  descriptions (`docs/00-plan.md` §16).
+* **bridge** — `das_bridge`, the SSE client on the ask contract — a backend
+  at a time, keyed by ticket, not a singleton. Turns `milestone` and `answer`
+  events into speech, and `refusal` / `abstention` into fixed phrases that the
+  model never sees. It reads `path.speed` to know how an answer was reached
+  and never `path.detail`, which is this backend's own vocabulary.
 * **tts** — `local_tts` over the Kokoro service, and the server of
   pre-rendered acknowledgements.
 

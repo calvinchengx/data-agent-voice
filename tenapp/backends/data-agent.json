@@ -1,0 +1,20 @@
+{
+  "name": "data-agent",
+  "display": "your data",
+  "base_url": "${DAV_APIM_BASE}${DAV_ASK_PATH}",
+  "audience": "${DAV_AGENT_AUDIENCE}",
+  "contract_version": "1",
+  "fast_tools": [
+    {
+      "name": "glossary_lookup",
+      "description": "What a business term means, in this organisation's own words. Use it whenever someone asks what something means, or before a question that turns on a definition.",
+      "call": { "path": "${DAV_OM_MCP_PATH}", "tool": "search_metadata" },
+      "budget_ms": 400
+    }
+  ],
+  "dispatch": {
+    "tool": "ask_data",
+    "description": "Any question that needs numbers, tables, metrics or reports from the warehouse. Returns nothing to say: acknowledge, and the answer arrives when it arrives."
+  },
+  "phrases": "phrases/data-agent/"
+}

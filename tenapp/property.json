@@ -73,9 +73,8 @@
               "name": "tools",
               "addon": "das_tools",
               "property": {
-                "apim_base": "${env:DAV_APIM_BASE|https://apim-emulator:8445}",
-                "ask_path": "${env:DAV_ASK_PATH|/ask}",
-                "om_mcp_path": "${env:DAV_OM_MCP_PATH|/om/mcp}",
+                "backends_dir": "/app/agents/analyst_line/tenapp/backends",
+                "backends": "${env:DAV_BACKENDS|data-agent}",
                 "tls_insecure": "${env:DAV_TLS_INSECURE|true}"
               }
             },
@@ -84,8 +83,8 @@
               "name": "bridge",
               "addon": "das_bridge",
               "property": {
-                "apim_base": "${env:DAV_APIM_BASE|https://apim-emulator:8445}",
-                "ask_path": "${env:DAV_ASK_PATH|/ask}",
+                "backends_dir": "/app/agents/analyst_line/tenapp/backends",
+                "backends": "${env:DAV_BACKENDS|data-agent}",
                 "tls_insecure": "${env:DAV_TLS_INSECURE|true}"
               }
             },

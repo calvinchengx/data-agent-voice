@@ -27,6 +27,12 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.12
+      # The panel's arithmetic is JavaScript and is exercised by the same
+      # suite; without node those checks skip visibly rather than pass.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
 
       # Every gate runs, so one push reports everything wrong rather than the
       # first thing wrong. The repository next door lost three round trips a

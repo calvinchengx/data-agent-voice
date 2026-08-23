@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analyst Line — instrument panel</title>
+<style>
+:root{--bg:#0f1115;--panel:#171a21;--ink:#e9ecf1;--muted:#98a1b0;--line:#262b35;
+      --ok:#4fc3bd;--warn:#e0a33a;--bad:#e0605a;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:24px}
+h1{font-size:1.1rem;margin:0 0 4px;letter-spacing:.02em}
+.sub{color:var(--muted);margin:0 0 20px;font-size:.85rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.stat b{display:block;font:600 1.7rem/1.1 var(--mono);letter-spacing:-.02em}
+.stat span{display:block;color:var(--muted);font-size:.75rem;margin-top:6px;text-transform:uppercase;letter-spacing:.06em}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);font-size:.83rem}
+th{color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.06em;font-size:.7rem}
+td.n{font-family:var(--mono);text-align:right}
+tr:last-child td{border-bottom:none}
+.switches{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0}
+.sw{font-size:.72rem;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.sw.on{border-color:var(--ok);color:var(--ok)}
+.state{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--bad);margin-right:7px;vertical-align:middle}
+.state.live{background:var(--ok)}
+.note{color:var(--muted);font-size:.78rem;margin-top:18px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="state" id="dot"></span>Analyst Line — instrument panel</h1>
+  <p class="sub" id="conn">connecting…</p>
+
+  <div class="grid">
+    <div class="stat"><b id="p95-audio">—</b><span>p95 first audio</span></div>
+    <div class="stat"><b id="p95-eou">—</b><span>p95 end of utterance</span></div>
+    <div class="stat"><b id="p95-ttft">—</b><span>p95 host TTFT</span></div>
+    <div class="stat"><b id="p95-answer">—</b><span>p95 dispatch → answer</span></div>
+    <div class="stat"><b id="turns">0</b><span>turns</span></div>
+  </div>
+
+  <div class="switches" id="switches"></div>
+
+  <table>
+    <thead><tr><th>turn</th><th>tier</th><th class="n">eou</th><th class="n">ttft</th><th class="n">first audio</th><th class="n">answer</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <p class="note">
+    p95 by nearest rank, not interpolated: with a handful of turns the honest
+    report is the worst one. Nothing here is stored — the tab holds the current
+    call and forgets it when closed.
+  </p>
+</div>
+
+<script type="module">
+import { newTurn, mark, spans, summarise, tierOf } from './spans.js';
+
+const params = new URLSearchParams(location.search);
+const url = params.get('ws') || `ws://${location.hostname}:8765`;
+const turns = [];
+let current = null;
+
+const el = (id) => document.getElementById(id);
+const ms = (v) => (v === null || v === undefined ? '—' : `${Math.round(v)}`);
+const grade = (v, good, bad) => (v === null ? '' : v <= good ? 'ok' : v <= bad ? 'warn' : 'bad');
+
+for (const [name, on] of Object.entries({
+  'semantic eou': false, 'prefix cache': false, 'haiku host': true,
+  'sentence chunk': true, 'pre-rendered ack': true, 'speculative': false,
+})) {
+  const s = document.createElement('span');
+  s.className = `sw${on ? ' on' : ''}`;
+  s.textContent = name;
+  el('switches').append(s);
+}
+
+function render() {
+  const s = summarise(turns);
+  el('p95-audio').textContent = ms(s['first audio']);
+  el('p95-audio').className = grade(s['first audio'], 900, 1500);
+  el('p95-eou').textContent = ms(s['end of utterance']);
+  el('p95-eou').className = grade(s['end of utterance'], 400, 800);
+  el('p95-ttft').textContent = ms(s['host TTFT']);
+  el('p95-ttft').className = grade(s['host TTFT'], 400, 700);
+  el('p95-answer').textContent = ms(s.answer);
+  el('p95-answer').className = grade(s.answer, 14000, 25000);
+  el('turns').textContent = String(turns.length);
+
+  el('rows').innerHTML = turns.slice(-12).reverse().map((t) => {
+    const sp = spans(t);
+    return `<tr><td>${t.id}</td><td>tier ${tierOf(t)}</td>` +
+      `<td class="n ${grade(sp['end of utterance'],400,800)}">${ms(sp['end of utterance'])}</td>` +
+      `<td class="n ${grade(sp['host TTFT'],400,700)}">${ms(sp['host TTFT'])}</td>` +
+      `<td class="n ${grade(sp['first audio'],900,1500)}">${ms(sp['first audio'])}</td>` +
+      `<td class="n">${ms(sp.answer)}</td></tr>`;
+  }).join('');
+}
+
+function connect() {
+  const ws = new WebSocket(url);
+  ws.onopen = () => { el('dot').className = 'state live'; el('conn').textContent = url; };
+  ws.onclose = () => {
+    el('dot').className = 'state';
+    el('conn').textContent = `${url} — reconnecting`;
+    setTimeout(connect, 1500);
+  };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    const at = performance.now();
+
+    if (m.type === 'data' && m.name === 'text_data') {
+      const d = m.data || {};
+      if (d.role === 'user' && !d.is_final && !current) {
+        current = newTurn(turns.length + 1, at);
+        mark(current, 'speech end', at);
+      }
+      if (d.role === 'user' && d.is_final && current) mark(current, 'transcript final', at);
+      if (d.role === 'assistant' && current) mark(current, 'model first token', at);
+    }
+    if (m.type === 'data' && m.name === 'tts_audio_start' && current) mark(current, 'audio out', at);
+    if (m.type === 'cmd' && m.name === 'ask_dispatched' && current) {
+      mark(current, 'dispatched', at); current.kinds.push('dispatched');
+    }
+    if (m.type === 'data' && m.name === 'agent_turn' && current) {
+      const kind = (m.data || {}).kind;
+      if (['answer','refusal','abstention','error'].includes(kind)) {
+        mark(current, 'answered', at);
+        turns.push(current); current = null;
+      }
+    }
+    // A tier-0 or tier-1 turn ends when the voice stops: nothing was dispatched.
+    if (m.type === 'data' && m.name === 'tts_audio_end' && current && !current.kinds.includes('dispatched')) {
+      turns.push(current); current = null;
+    }
+    render();
+  };
+}
+connect();
+render();
+</script>
+</body>
+</html>

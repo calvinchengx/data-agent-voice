@@ -43,10 +43,12 @@ holding with a person talking to the line.
 | Everything the caller hears leaves through one path, so there is never a second speaker with no arbiter | 🟢 structurally | `make test` — one `tts_text_input` send in `das_host` | not yet |
 | A refusal, an abstention and an error each have their own fixed phrase, and the refusal does not sound like missing data | 🟢 | `make test` — 8 checks over the host's policy | not yet |
 | A person speaks and hears an answer | 🔴 **not run** — all four extensions exist and the image runs; no audio has been through it | `make up && make call` | not yet |
-| First audio under 900 ms at p95 | 🔴 **not run** | `make test` (phase 5 of the plan) | not yet |
+| The panel's arithmetic is right: p95 by nearest rank, a span needs both marks, the first mark wins, and an unmeasured phase reads as nothing rather than zero | 🟢 | `make test` — 11 checks run through node | not yet |
+| The panel stores nothing — no transcript, no question, no audio | 🟢 | `make test` — the page uses no storage API | not yet |
+| A mis-transcribed entity produces a confirmation, not a dispatch | 🟢 the decision; 🔴 the call | `make test` — 15 checks over the uncertainty rules | not yet |
+| First audio under 900 ms at p95 | 🔴 **not run** — the panel can measure it; nothing has been measured | `make up`, then a call | not yet |
 | A definitional question is answered without dispatching | 🔴 **not run** | the tiers witness | not yet |
 | A refusal is spoken from a fixed phrase and never paraphrased | 🔴 **not run** | the refusal witness | not yet |
-| A mis-transcribed entity produces a confirmation, not an answer | 🔴 **not run** | the confirm witness | not yet |
 | Semantic turn detection beats fixed silence | 🔴 **not run** — needs a GPU this machine does not have | switch #1, off vs on | not yet |
 
 ## Upstream, for reference

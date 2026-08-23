@@ -1,6 +1,6 @@
 # Data Agent Voice — Architecture & Implementation Plan
 
-Status: **DRAFT for review — no implementation started.** Last updated 2026-08-23 (upstream ask service landed; §2, §12, §13 revised).
+Status: **DRAFT for review — no implementation started.** Last updated 2026-08-23 (TEN pinned at 0.11.71 — see `docs/05-ten.md`; D4, D5, D10, D11, §2, §5, §9, §10 revised).
 
 Repo: `~/calvinchengx/emulators/data-agent-voice` · Family tier: **leaf / consumer** — it consumes `data-agent-service`, which consumes the emulators; it emulates nothing · License: Apache-2.0 · Product name inside the repo: **the Analyst Line**.
 
@@ -16,7 +16,7 @@ Inherited from `data-agent-service` and extended by one rule.
 
 | Rule | Meaning | Enforcement |
 |---|---|---|
-| **Dependencies as-is** | `data-agent-service`, the emulators, OpenMetadata and the TEN framework are consumed by published image or package and never modified. A suspected bug is written up in `docs/upstream-issues.md`. Only `data-agent-voice` is built here. | Compose pins published images; TEN pinned by version; no forks |
+| **Dependencies as-is** | `data-agent-service`, the emulators, OpenMetadata and the TEN framework are consumed by published image or package and never modified. A suspected bug is written up in `docs/upstream-issues.md`. Only `data-agent-voice` is built here. **One stated exception:** TEN extensions are vendored by path (that is how TEN pins them), and a vendored extension may carry a patch — each patch is an upstream PR first, and `extensions/vendor/<name>/VENDORED` names the tag and the PR. | Compose pins published images; TEN pinned by tag + build image + `manifest-lock.json`; a patch without a PR link fails a check |
 | **Prod-identical** | No emulator-only code path. The voice stack reaches the data only through the gateway with the user's own token, exactly as any MCP client. `ENV=prod` swaps `.env` and nothing else — including the speech provider. | CI grep-gate for forbidden endpoints; `make test ENV=prod` runs unchanged |
 | **Nothing voice-shaped leaks upstream** | Anything a Slack bot would also want belongs in `data-agent-service`'s ask contract and is proposed there. Anything only a voice client wants — caps, tiers, fillers, barge-in — lives here. | Review rule; `docs/20-ask-service.md` upstream names the test |
 | **The guards are not here** | This repo holds no authority. It cannot refuse, scope, or admit anything; it can only ask. A refusal arrives as a `refusal` event and is spoken from a fixed phrase, never paraphrased by a model. | Witness: a refused question produces the refusal phrase verbatim |
@@ -50,9 +50,9 @@ Inherited from `data-agent-service` and extended by one rule.
 | Upstream already carries: structured `step`/`milestone` events, conversation `history`, coarse cancellation between hops, prompt caching on the agent's prefix with a rolling breakpoint, and `cache_read_tokens`/`hops` in `done` | same commit | Three of the five asks in §15 are done; the host's TTFT and the panel's cache-hit view have real numbers to read |
 | `DAS_RATE_CALLS=60/60s` per caller, and every sub-agent runs as the same user | `data-agent-service/.env.example` | A voice conversation plus fan-out can throttle itself. Rate tier for the voice caller, or the supervisor front-loads schema so branches do not rediscover it; decided upstream, tracked in §13 |
 | Human turn gap ≈ 200 ms; > 800 ms reads as thinking; > 1.5 s reads as broken | conversation-design literature; **to be measured on this stack** | The budget in §9. Treated as a hypothesis until the panel confirms it |
-| Fixed-silence end-of-utterance costs 500–800 ms; model-based EOU 200–400 ms | TEN turn-detection extension docs, **to confirm at the pinned version** | The single largest non-LLM lever (§10) |
-| TEN models a graph of extensions passing `cmd` / `data` / `audio_frame` with interrupt propagation | TEN framework docs, **to confirm at the pinned version** | Two custom extensions (§5); everything else stock |
-| ASR has no emulator. Speech in CI is either a paid cloud call or local weights | — | Local models (faster-whisper, Piper or Kokoro) in CI; cloud by `.env` (D5). The weights are the one large artefact this repo carries |
+| **TEN 0.11.71 read from the tag** (`docs/05-ten.md`): RTC-first on Agora (cloud account); `websocket_server` is the local transport; `main_python` is ~200 lines and already does sentence-chunked TTS and flush-on-barge-in; tools are extensions registered by `tool_register`; `anthropic_llm2_python` landed in this release with effort and refusal fallback but **no prompt caching**; semantic turn detection is a **vLLM-served model**, not a classifier; `whisper_stt_python` exists, **no local TTS exists** | `ten-framework@0.11.71` | D4, D5, D10, D11 and §5, §9, §10 revised below. Everything marked "to confirm" in the first draft is now either confirmed or corrected |
+| Fixed-silence EOU vs model-based EOU: the model-based path needs a served LLM | `ten_turn_detection/config.py` at the tag | CI runs fixed; the demo runs semantic behind a compose profile (§10-1) |
+| ASR has no emulator; local ASR exists in TEN, local TTS does not | `whisper_stt_python`; the TTS catalogue at the tag | faster-whisper stock; **a custom TTS extension** fronting Piper/Kokoro, proposed upstream (D5) |
 | `data-agent-service` has device-code sign-in in `agent/identity.py` | upstream | The person signs in before the call; the token is held for the session (D6) |
 | The promoter's privacy argument: the only claim that survives is that the data is not there | `data-agent-service/promoter/__init__.py` | No transcript is stored. Audio is not retained. The question text exists in the ask service's `accepted` event and nowhere here (D7) |
 
@@ -102,14 +102,14 @@ Everything in the data path — identity, guards, authorization, audit — is up
 | D1 | Where the agent runs | **Off the voice turn**, behind the ask contract | 26 s cannot be made 0.8 s; the conversation stops waiting instead |
 | D2 | Who orchestrates sub-agents | **The ask service upstream**, never the host | A host that fans out becomes latency-bound and the two-loop design collapses |
 | D3 | Turn policy | **Three tiers, decided by the host in its first tokens**: 0 conversational, 1 definitional (one catalog hop), 2 analytical (dispatch) | Definitional questions are a large share of what analysts ask and fit the budget; `path` on answers is the general signal this policy rides on |
-| D4 | Host model | **Haiku 4.5, effort `low`, cached prefix, streaming** | The host speaks sentences; prefill is most of its time; caching is decisive here and not upstream |
-| D5 | Speech | **Local in CI** (faster-whisper; Piper or Kokoro), **cloud by `.env`** | Hermetic CI, prod-identical by configuration — the family rule one level up |
+| D4 | Host model | **Haiku 4.5, effort `low`, streaming, via `anthropic_llm2_python`; cached prefix once the vendored extension carries a breakpoint** | The host speaks sentences; prefill is most of its time; caching is decisive here and not upstream. The stock extension has no `cache_control`; that patch is a phase-1 task and an upstream PR (`05-ten.md` §3) |
+| D5 | Speech | **Local in CI** — `whisper_stt_python` stock; **a custom `AsyncTTS2HttpExtension` fronting Piper or Kokoro** because no local TTS exists at the tag — **cloud by `.env`** | Hermetic CI, prod-identical by configuration. The TTS extension is proposed upstream: "a TTS that needs no account" is missing from the catalogue |
 | D6 | Identity | **Device-code sign-in before the call; token held for the session; refresh via upstream `identity.py`** | Every hop downstream is as the user. Re-auth mid-call is a known unsolved UX (§13) |
 | D7 | Retention | **No audio, no transcript, no question stored here** | The promoter's argument. The panel records timings and event types only |
 | D8 | Milestone rendering | **Templates from `milestone.{phase, subject, source}`**, never model prose | Bounded length, zero latency, no second place semantics can drift |
 | D9 | Refusal and abstention | **Fixed phrases bound to the event type; the host never sees them as text to rewrite** | Criterion 5. A refusal smoothed into prose is the failure upstream exists to prevent |
-| D10 | TEN placement | **Thin extensions speaking HTTP/SSE to the ask service** | Media pipeline and agent runtime scale, deploy and fail independently; a 26 s unit of work inside a graph node makes flush semantics unworkable |
-| D11 | Transport | **Browser WebRTC first; telephony a later phase** | Hermetic and demo-able on a laptop; a phone number is a real external dependency |
+| D10 | TEN placement | **Thin extensions speaking HTTP/SSE to the ask service**: `das_host` is a fork of TEN's own `main_python`; `dispatch`/`glossary_lookup`/`confirm` are tool extensions; `das_bridge` injects agent-initiated turns | Confirmed at the tag: this is the shape TEN wants for external systems. `mcp_client_python` exists and **must not** be on the host — it would hand `run_query` to the conversational model |
+| D11 | Transport | **Browser over `websocket_server` first** (local, no account); **Agora RTC by `.env` for prod**; telephony via the SIP examples later | TEN is RTC-first on Agora and has no local WebRTC. WebSocket gives up Opus/FEC/UDP and keeps a laptop demo and a CI that runs |
 | D12 | Entity confirmation | **Confirm before dispatch when the entity is high-stakes or ASR confidence is low** | ASR sits upstream of every guard; a correct query about the wrong team passes every check |
 
 ---
@@ -119,7 +119,10 @@ Everything in the data path — identity, guards, authorization, audit — is up
 | Path | What | Language | Notes |
 |---|---|---|---|
 | `graph/` | The TEN graph definition: VAD, ASR, EOU, host, TTS, bridge, their wiring | TEN manifest / JSON | Stock extensions pinned; two custom |
-| `extensions/das_host/` | The conversational agent: tiering, tool calls, sentence chunking, barge-in abort | Python | Anthropic SDK, streaming, `cache_control` on the prefix |
+| `extensions/das_host/` | Fork of TEN's `main_python`: tier policy, dispatch path, fixed-phrase bypass, pre-rendered acks; sentence chunking and flush are inherited | Python | the host's LLM is a separate `anthropic_llm2_python` node |
+| `extensions/das_tools/` | `glossary_lookup`, `dispatch`, `confirm` as LLM tools (`AsyncLLMToolBaseExtension`) | Python | the only tools the host's LLM ever sees |
+| `extensions/local_tts/` | `AsyncTTS2HttpExtension` over a local Piper/Kokoro server; serves pre-rendered phrases by match | Python | D5; upstream candidate |
+| `extensions/vendor/` | Extensions copied from the tag, with a `VENDORED` file naming it and every patch an upstream PR | — | `05-ten.md` §7 |
 | `extensions/das_bridge/` | SSE client to the ask service; renders milestones; injects agent-initiated turns; cancels on barge-in | Python | Speaks `events.schema.json`; validates every event |
 | `phrases/` | Fixed phrases for refusal, abstention, error, and the acknowledgement set; pre-rendered audio built at `make up` | text + wav | D8, D9 |
 | `panel/` | The instrument panel: per-turn spans, p95s, switch states, branch view | TypeScript | Reads the bridge's timing stream; stores no content |
@@ -192,9 +195,9 @@ Estimates, not measurements. The panel replaces every number here with a measure
 | Segment | Estimate | Lever |
 |---|---|---|
 | WebRTC in | 20–40 ms | co-locate |
-| End-of-utterance | 200–400 ms semantic; 500–800 fixed | §10-1 |
+| End-of-utterance | 500–800 ms fixed (CI); 200–400 ms semantic **on a GPU-served model** (demo) | §10-1 |
 | ASR finalize (streaming) | 50–150 ms | local vs cloud |
-| Host TTFT | 200–400 ms cached; 400–700 uncached | §10-2, D4 |
+| Host TTFT | 400–700 ms uncached (stock); 200–400 ms once the cache patch lands | §10-2, D4 |
 | TTS time-to-first-byte | 80–200 ms; **≈ 0 pre-rendered** | §10-4, §10-5 |
 | Jitter + playback | 40–80 ms | — |
 
@@ -214,8 +217,8 @@ Every lever is an env flag and a panel delta, because "we optimized latency" is 
 
 | # | Switch | Off | On | What changes, and what it attacks |
 |---|---|---|---|---|
-| 1 | `DAV_EOU_MODE` | 700 ms fixed silence | semantic EOU | Dead air after every sentence. **Largest non-LLM lever**, every turn |
-| 2 | `DAV_CACHE_PREFIX` | no `cache_control` | breakpoint after tools + system | Host TTFT; panel shows `cache_read_input_tokens`. Decisive here, marginal upstream |
+| 1 | `DAV_EOU_MODE` | fixed silence (VAD + ASR finality; **CI**) | `ten_turn_detection` + a vLLM service behind a compose profile (**demo**) | Dead air after every sentence. **Largest non-LLM lever**, and the most expensive to run |
+| 2 | `DAV_CACHE_PREFIX` | no `cache_control` (stock extension) | breakpoint after tools + system (vendored patch) | Host TTFT; panel shows `cache_read_input_tokens`. Decisive here, marginal upstream. Off until the patch lands |
 | 3 | `DAV_HOST_MODEL` | Opus 5 / high | Haiku 4.5 / low | ~1 s → ~250 ms TTFT |
 | 4 | `DAV_TTS_CHUNK` | wait for completion | first sentence boundary | Multi-second stall → immediate speech |
 | 5 | `DAV_PRERENDERED_ACK` | synthesize live | pre-rendered wav | 120 ms TTS TTFB → 0 on tier 2 |
@@ -276,7 +279,8 @@ Phases 0–2 are the demo. 3–5 make it the one described here. 6–8 are new s
 | **ASR upstream of every guard**: a perfectly-formed query about the wrong entity passes every check | certain | D12; the confirm witness; say it in the docs as the new error class it is |
 | The voice caller throttles itself on `DAS_RATE_CALLS` once fan-out lands | high at demo N | Decide upstream: a rate tier for the voice app role, or the supervisor front-loads schema. Tracked as an upstream proposal, not changed here |
 | The 800 ms budget is literature, not this stack | medium | Phase 4 measures; §9 is rewritten from the panel, not defended |
-| TEN extension API at the pinned version differs from what §5 assumes | medium | Pin first; `docs/05-ten.md` records what was actually true; findings here marked **to confirm** until then |
+| Semantic turn detection needs a served LLM and may be slower than silence on a laptop CPU | high | CI runs fixed; the demo machine runs vLLM on a GPU or the switch stays off and the panel says so |
+| The cache patch to `anthropic_llm2_python` drifts from an upstream that is days old and moving | medium | Small patch, PR first, re-based on each pin bump; switch #2 reads "off" until merged |
 | Local speech models are the one large artefact | certain | Pulled at `make up`, cached, never committed; sizes in `make doctor` |
 | Re-auth mid-call has no good UX | certain | Say so; the host asks for sign-in again; a long-session design is out of scope |
 | Model-generated narration creeps back in because it sounds better | high | D8 and D9 are witnesses, not guidance; a template that sounds wrong is fixed in `phrases/` |

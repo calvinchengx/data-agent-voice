@@ -132,19 +132,25 @@ footer a{text-decoration:none}
   </div>
 </nav>
 
-<header class="wrap">
-  <h1>Talk to your governed data.</h1>
-  <p class="lede">Ask out loud. Hear the answer with the definition it applied and the
-  caveat it raised &mdash; because you cannot skim audio, and a number without its meaning
-  is how the wrong team wins.</p>
-  <p class="sub">A voice front end over
-  <a href="https://github.com/calvinchengx/data-agent-service">data-agent-service</a>,
-  built on the <a href="https://github.com/TEN-framework/ten-framework">TEN framework</a>.
-  You sign in once, and every question runs as you, all the way to the source.</p>
-  <div class="cta">
-    <a class="btn" href="docs/00-plan/">Read the plan</a>
-    <a class="btn ghost" href="docs/parity/">What is witnessed</a>
-    <a class="btn ghost" href="#start">Run it</a>
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Data Agent Voice</p>
+    <h1>Talk to your governed data.</h1>
+    <p>Ask out loud. Hear the answer with the definition it applied and the caveat it
+    raised &mdash; because you cannot skim audio, and a number without its meaning is how the
+    wrong team wins.</p>
+    <p>A voice front end over
+    <a href="https://github.com/calvinchengx/data-agent-service">data-agent-service</a>,
+    built on the <a href="https://github.com/TEN-framework/ten-framework">TEN framework</a>.
+    You sign in once, and every question runs as you, all the way to the source.</p>
+    <p class="claim">No one has heard an answer from this yet. Every capability below says
+    which it is &mdash; written, run, or waiting on something &mdash; and carries what would
+    catch it if it were false.</p>
+    <div class="cta">
+      <a class="btn primary" href="docs/">Read the docs</a>
+      <a class="btn ghost" href="https://github.com/calvinchengx/data-agent-voice">Source on GitHub</a>
+      <a class="btn ghost" href="#start">Run it locally</a>
+    </div>
   </div>
 </header>
 
@@ -175,13 +181,13 @@ footer a{text-decoration:none}
   <div class="wrap">
     <h2>How it fits together</h2>
     <div class="scroll">
-<pre class="bx">  browser &mdash;&mdash; audio &mdash;&mdash;&gt;  TEN graph
-                          &#9474;
-        ASR &rarr; <b>host</b> &rarr; model &rarr; TTS &rarr; audio back      &#8804; 1 second
-                    &#9474;
-                    &#9500;&#8212; lookup   &rarr; the catalog             &#8776; 1.5 seconds
-                    &#9492;&#8212; dispatch &rarr; ask service &rarr; ticket   8&ndash;25 seconds,
-                                 &#9492;&#8212; bridge &rarr; host          narrated as it goes</pre>
+<pre><code>  browser ---- audio over WebSocket ----&gt; TEN graph
+                                            |
+     ASR --&gt; host --&gt; model --&gt; TTS --&gt; audio back        &#8804; 1 second
+              |
+              +-- lookup   --&gt; the catalog                &#8776; 1.5 seconds
+              +-- dispatch --&gt; ask service --&gt; ticket      8-25 seconds,
+                                  +-- bridge --&gt; host     narrated as it goes</code></pre>
     </div>
     <p class="sub">The host owns the turn and is the only thing that speaks. The slow
     agent runs where nobody is waiting, and its answer arrives as a spoken turn when it
@@ -273,9 +279,12 @@ footer a{text-decoration:none}
     <p>So the split is not a compromise for a demo. It is the architecture: a small model
     owns the turn and answers what it can in under a second, and the careful one runs where
     nobody is waiting and narrates itself while it works.</p>
-    <div class="note">The numbers on this page are measured where they say
-    <b>run</b> and estimated where they do not. <a href="docs/parity/">The ledger</a> keeps
-    them apart.</div>
+    <div class="note">
+      <b>Measured where it says run, estimated everywhere else.</b>
+      <p>The budget on this page is an estimate until the panel replaces each number
+      with one it watched. <a href="docs/parity/">The ledger</a> keeps the two apart,
+      row by row.</p>
+    </div>
   </div>
 </section>
 
@@ -301,10 +310,10 @@ footer a{text-decoration:none}
 <section class="sec" id="start">
   <div class="wrap">
     <h2>Run it locally</h2>
-<pre class="bx">make doctor   <span class="ac"># toolchain, docker, and the upstream stack</span>
-make up       <span class="ac"># the graph and a local voice</span>
-make status   <span class="ac"># is the line usable?</span>
-make call     <span class="ac"># open the browser client</span></pre>
+<pre><code>make doctor   # toolchain, docker, and the upstream stack
+make up       # the graph and a local voice
+make status   # is the line usable?
+make call     # open the browser client</code></pre>
     <p class="sub"><code>make up</code> needs
     <a href="https://github.com/calvinchengx/data-agent-service">data-agent-service</a>
     running first: this reaches its gateway over the network and never runs it. A

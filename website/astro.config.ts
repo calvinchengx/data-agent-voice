@@ -33,7 +33,7 @@ export default defineConfig({
         },
         {
           label: 'What was read',
-          items: [{ slug: '05-ten' }],
+          items: [{ slug: '05-ten' }, { slug: '06-ci' }],
         },
         {
           // Living ledgers rather than chapters: a reader looks things up here.

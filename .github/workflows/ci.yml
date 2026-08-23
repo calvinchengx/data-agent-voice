@@ -18,6 +18,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # What kind of change is this? The image jobs cost about nine minutes of
+  # runner time between them, and a typo in a document cannot break an image.
+  # So they are gated on something outside the documentation having moved.
+  #
+  # The gate FAILS OPEN. If the base commit cannot be determined -- a first
+  # push, a force push, a re-run -- it reports `code` and everything runs. A
+  # gate that guesses "docs only" when it does not know is a gate that skips
+  # the build on the one commit that needed it.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.what.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: what
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ github.event_name }}" in
+            pull_request) base="${{ github.event.pull_request.base.sha }}" ;;
+            push)         base="${{ github.event.before }}" ;;
+            *)            base="" ;;
+          esac
+          kind=$(python3 scripts/changed_kind.py "$base")
+          if [ "$kind" = "docs" ]; then
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Docs-only change::the image jobs are skipped; nothing outside docs/, website/, site/ or the top-level documents moved"
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
+
   quality:
     name: Lint, and the configuration held to itself
     runs-on: ubuntu-latest
@@ -61,6 +95,8 @@ jobs:
 
   image:
     name: The image builds (${{ matrix.arch }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false

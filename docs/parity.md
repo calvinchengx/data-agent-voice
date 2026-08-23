@@ -35,9 +35,9 @@ holding with a person talking to the line.
 
 | Capability | Witnessed locally | Check | Witnessed running |
 |---|---|---|---|
-| The image builds on amd64 | 🟢 | `docker buildx build --platform linux/amd64` — 904 MB | not yet |
-| The image builds on arm64 from the release assets, and `faster-whisper` installs there | 🟢 — `ctranslate2` 4.8.1 has an aarch64 wheel | `docker buildx build --platform linux/arm64` — 986 MB | not yet |
-| The server starts and registers the graph | 🟢 on arm64 | `/health` answers, `/graphs` lists `analyst_line` | not yet |
+| The image builds on amd64 | 🟢 in CI, every push | the `image (amd64)` job — 904 MB, 326 s | not yet |
+| The image builds on arm64 from the release assets, and `faster-whisper` installs there | 🟢 in CI, on a native arm runner — `ctranslate2` 4.8.1 has an aarch64 wheel | the `image (arm64)` job — 986 MB, 213 s | not yet |
+| The server starts and registers the graph, on both architectures | 🟢 in CI | the smoke step: `/health` answers and `/graphs` lists `analyst_line` | not yet |
 | A backend descriptor loads, interpolates its settings, and every way it can be malformed is refused at start-up rather than at run time | 🟢 | `make test` — 15 checks over `das_tools/descriptor.py` | not yet |
 | A pre-rendered phrase and a synthesized one are one code path to everything downstream | 🟢 by construction | `local_tts` serves both through `get()`; no test reaches it without the runtime | not yet |
 | Everything the caller hears leaves through one path, so there is never a second speaker with no arbiter | 🟢 structurally | `make test` — one `tts_text_input` send in `das_host` | not yet |

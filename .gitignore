@@ -7,3 +7,6 @@ __pycache__/
 node_modules/
 panel/dist/
 phrases/*.wav
+_site/
+dist/
+.coverage

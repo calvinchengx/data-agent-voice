@@ -1,0 +1,75 @@
+# Lint, types and the checks that hold this repository's configuration to
+# itself. There is no runtime here yet -- the four extensions the graph names
+# are the next commit -- so what CI can prove is that the files agree, and it
+# proves exactly that and no more (docs/parity.md).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, and the configuration held to itself
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+
+      # Every gate runs, so one push reports everything wrong rather than the
+      # first thing wrong. The repository next door lost three round trips a
+      # day to a job that stopped at the first failure.
+      - name: Ruff
+        if: ${{ !cancelled() }}
+        run: uv run --with ruff ruff check .
+      - name: Format
+        if: ${{ !cancelled() }}
+        run: uv run --with ruff ruff format --check .
+      - name: The configuration agrees with itself
+        if: ${{ !cancelled() }}
+        run: uv run --with pytest --with pytest-cov python -m pytest -q
+      - name: The recorded witness count is the one the suite proves
+        if: ${{ !cancelled() }}
+        run: uv run --with pytest --with pytest-cov python scripts/witnesses.py --check
+      - name: The sidebar and docs/ agree, on what is committed
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check_docs_nav.py
+      - name: The compose file parses and its pins resolve
+        if: ${{ !cancelled() }}
+        run: |
+          cp .env.example .env
+          docker compose config -q
+          echo "compose ok"
+
+  image:
+    name: The image builds, on both architectures
+    runs-on: ubuntu-latest
+    # The arm64 leg is assembled from the release assets rather than the
+    # registry, which serves linux/x64 only (docs/05-ten.md §8). It is slow
+    # and it is the one that will break first, so it runs here rather than
+    # being discovered on someone's laptop.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/ten/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

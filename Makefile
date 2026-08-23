@@ -28,7 +28,7 @@ endif
 
 PY ?= $(shell for c in python3.13 python3.12 python3 python py; do if "$$c" -c 'import sys; assert sys.version_info >= (3,12)' >/dev/null 2>&1; then echo "$$c"; break; fi; done)
 
-.PHONY: help doctor up down clean restart status ps logs pull build call test load lint format vendor vendor-check lock
+.PHONY: help doctor up down clean restart status ps logs pull build call test witnesses lint format docs docs-build vendor vendor-check lock
 
 help: ## Show the available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -82,17 +82,34 @@ logs: ## Follow logs (SERVICE=name to filter)
 call: ## Open the browser client against the running line
 	@$(PY) -m webbrowser "http://localhost:$${TEN_API_PORT:-8080}/" >/dev/null 2>&1 || echo "open http://localhost:$${TEN_API_PORT:-8080}/"
 
-test: ## The witnesses: scripted audio in, assertions on events and timings out
-	$(TOOLS) python -m e2e.run $(ARGS)
+test: ## The checks that hold this repo's configuration to itself
+	uv run --with pytest --with pytest-cov python -m pytest -q $(ARGS)
+
+witnesses: ## Record what the suite witnessed, for the badges (--check to verify)
+	uv run --with pytest --with pytest-cov python scripts/witnesses.py $(ARGS)
+
+docs: ## Serve the documentation site locally
+	pnpm install && pnpm run docs:dev
+
+docs-build: ## Build the site exactly as the workflow does, into _site/
+	pnpm install --frozen-lockfile
+	python3 scripts/check_docs_nav.py
+	pnpm --filter data-agent-voice-docs typecheck
+	pnpm run docs:build
+	rm -rf _site && mkdir -p _site
+	cp site/index.html _site/index.html
+	cp -R website/dist _site/docs
+	python3 scripts/badges.py --out _site --landing site/index.html
+	python3 scripts/check_links.py --site _site
 
 load: ## N concurrent conversations against the line (ARGS="--conversations 5")
 	$(TOOLS) python -m load.run $(ARGS)
 
 lint: ## Ruff over the extensions and harnesses
-	uv run ruff check .
+	uv run --with ruff ruff check .
 
 format: ## Ruff format
-	uv run ruff format .
+	uv run --with ruff ruff format .
 
 vendor: ## Copy the extensions this repo uses from the pinned TEN tag into extensions/vendor/
 	$(PY) scripts/vendor.py --tag $$(grep -E '^TEN_VERSION=' .env.example | cut -d= -f2)

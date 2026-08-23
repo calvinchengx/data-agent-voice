@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Agent Voice — the Analyst Line</title>
+<meta name="description" content="Talk to your governed data. A voice front end over data-agent-service, where the conversation never waits for the agent and a refusal is never narrated.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◉</text></svg>">
+<style>
+:root{
+  --bg:#fbfbfa; --panel:#fff; --ink:#16181d; --muted:#5c6270; --line:#e3e5e9;
+  --accent:#0f6f6b; --accent-soft:#e6f2f1;
+  --ship:#0f6f6b; --ship-bg:#e6f2f1;
+  --wip:#8a5a00; --wip-bg:#fdf3e0;
+  --plan:#5c6270; --plan-bg:#eef0f3;
+  --code:#f4f5f7; --radius:14px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#101216;--panel:#171a20;--ink:#e8eaee;--muted:#9aa2b1;--line:#262a33;
+        --accent:#4fc3bd;--accent-soft:#12302e;--ship:#4fc3bd;--ship-bg:#12302e;
+        --wip:#e0a33a;--wip-bg:#2e2412;--plan:#9aa2b1;--plan-bg:#1d2129;--code:#1c2028;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding:0 24px}
+header{padding:72px 0 40px}
+h1{font-size:clamp(2rem,5vw,2.9rem);line-height:1.15;margin:0 0 14px;letter-spacing:-.02em}
+.tag{color:var(--muted);font-size:1.12rem;margin:0 0 26px;max-width:60ch}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px}
+.pill{font-size:.8rem;padding:4px 11px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pill.now{background:var(--wip-bg);color:var(--wip);border-color:transparent;font-weight:600}
+.cta{display:flex;flex-wrap:wrap;gap:12px}
+.btn{display:inline-block;padding:11px 20px;border-radius:10px;text-decoration:none;font-weight:600;font-size:.95rem}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.ghost{border:1px solid var(--line);color:var(--ink)}
+section{padding:34px 0;border-top:1px solid var(--line)}
+h2{font-size:1.35rem;margin:0 0 16px;letter-spacing:-.01em}
+p{margin:0 0 16px}
+.lead{font-size:1.05rem}
+.gap{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:22px 0}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+.stat b{display:block;font-size:1.8rem;line-height:1.1;color:var(--accent);letter-spacing:-.02em}
+.stat span{display:block;color:var(--muted);font-size:.85rem;margin-top:4px}
+ul{margin:0 0 16px;padding-left:20px}
+li{margin-bottom:10px}
+code{font-family:var(--mono);font-size:.88em;background:var(--code);padding:2px 6px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:var(--radius);padding:16px;overflow-x:auto;font-family:var(--mono);font-size:.86rem;line-height:1.5}
+pre code{background:none;padding:0}
+.note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--wip);border-radius:var(--radius);padding:18px 20px;margin:22px 0}
+.note b{color:var(--wip)}
+footer{padding:36px 0 60px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Talk to your governed data.</h1>
+  <p class="tag">Ask in English, out loud. Hear the answer with the definition it applied and the caveat it raised — because you cannot skim audio, and a number without its meaning is how the wrong team wins.</p>
+  <div class="pills">
+    <span class="pill now">plan and scaffolding</span>
+    <span class="pill">TEN 0.11.71</span>
+    <span class="pill">multi-arch</span>
+    <span class="pill">Apache-2.0</span>
+  </div>
+  <div class="cta">
+    <a class="btn primary" href="docs/">Read the docs</a>
+    <a class="btn ghost" href="https://github.com/calvinchengx/data-agent-voice">GitHub</a>
+    <a class="btn ghost" href="docs/parity/">What is witnessed</a>
+  </div>
+</header>
+
+<section>
+  <h2>The gap this is built around</h2>
+  <p class="lead">A question to <a href="https://github.com/calvinchengx/data-agent-service">data-agent-service</a> takes twenty-six seconds at the median — six to eight careful model turns. A conversation reads as broken after about one second of silence.</p>
+  <div class="gap">
+    <div class="stat"><b>26s</b><span>median, one question</span></div>
+    <div class="stat"><b>~800ms</b><span>before it feels slow</span></div>
+    <div class="stat"><b>30×</b><span>the gap</span></div>
+    <div class="stat"><b>38</b><span>checks on the design</span></div>
+  </div>
+  <p>No faster model closes that. So this does not try to: the conversation stops waiting.</p>
+  <ul>
+    <li><b>A small model owns the turn</b> and speaks before any tool resolves, so first audio arrives in under a second whatever was asked.</li>
+    <li><b>Definitional questions never reach the warehouse.</b> "What counts as resolved?" is one catalog hop — about a second, no SQL, no waiting.</li>
+    <li><b>The slow agent runs where nobody is waiting,</b> narrating its progress and speaking its answer when it has one.</li>
+    <li><b>A refusal is never narrated.</b> Refused, abstained and answered are three distinct events; the first two are spoken from fixed phrases the model never sees.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>A backend is a file, not a code path</h2>
+  <p>The line knows <em>kinds</em> of capability — a fast lookup, a dispatch, a terminal outcome — and never a capability's name. Adding a second service is a descriptor:</p>
+<pre><code>{
+  "name": "data-agent",
+  "dispatch": { "tool": "ask_data",
+                "description": "Questions needing numbers, tables or metrics." },
+  "fast_tools": [{ "name": "glossary_lookup", "budget_ms": 400 }]
+}</code></pre>
+  <p>The host's model routes between backends by their tool descriptions, in the same turn, at no extra latency. A check in the suite fails if any general layer starts naming one service's vocabulary.</p>
+</section>
+
+<section>
+  <h2>What is actually true today</h2>
+  <div class="note">
+    <p><b>No audio has ever been through this.</b> Four extensions the graph names are not written yet. What exists is the architecture, the pinned framework read from its source, a multi-arch image, the graph, and <b>38</b><span>end-to-end witnesses</span> holding the configuration to itself.</p>
+    <p style="margin:0">Every row of <a href="docs/parity/">the ledger</a> that describes a working line reads <code>not run</code>. That is the point of keeping one.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Start</h2>
+<pre><code>make doctor   # toolchain, docker, and the upstream stack
+make up       # ten + local tts
+make status   # is the line usable?</code></pre>
+  <p><code>make up</code> needs <code>data-agent-service</code> running first: this repository reaches its gateway over the network and never runs it.</p>
+</section>
+
+<footer>
+  <div class="wrap" style="padding:0">
+    Apache-2.0 · <a href="https://github.com/calvinchengx/data-agent-voice">calvinchengx/data-agent-voice</a> ·
+    consumes <a href="https://github.com/calvinchengx/data-agent-service">data-agent-service</a> ·
+    built on <a href="https://github.com/TEN-framework/ten-framework">TEN</a>
+  </div>
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,85 @@
+# The documentation site: /docs rendered by Astro + Starlight, the same shape
+# every emulator in this family uses. /docs stays the single source of truth --
+# website/scripts/sync-docs.ts generates the site's content from it, so nothing
+# is written twice and the Markdown keeps working on GitHub.
+name: Docs site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'docs/**'
+      - 'scripts/badges.py'
+      - 'tests/**'
+      - 'website/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/docs-site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one midway: a half-finished
+# deploy would leave the published site in whatever state it reached.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Before anything is built: a sidebar entry whose page was never
+      # committed fails the Astro build outright, and only here -- the author's
+      # working tree has the file. Seconds, and it names the cause.
+      - name: The sidebar and docs/ agree, on what is committed
+        run: python3 scripts/check_docs_nav.py
+      # The sync script is type-checked before it runs: it rewrites every link
+      # on the site, and a silent failure there publishes 404s.
+      - run: pnpm --filter data-agent-voice-docs typecheck
+      - run: pnpm run docs:build
+      # The published site is the landing page at the root with the rendered
+      # docs beneath it, so `/` stays the project's front door and every
+      # chapter lives under /docs/.
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp site/index.html _site/index.html
+          cp -R website/dist _site/docs
+      # Badge endpoints README.md reads back through shields.io. The number
+      # comes from docs/witnesses.json, which a real run writes and the stack
+      # job re-verifies -- so a stale badge fails CI rather than lying here.
+      - name: Badge endpoints
+        run: python3 scripts/badges.py --out _site --landing site/index.html
+      # After assembly, because the assembled tree is what is served: the
+      # landing page sits above the docs and would read as broken from dist
+      # alone. Catches a link the build cannot -- a sidebar `link:` silently
+      # gains the base prefix, which shipped a 404 in the sidebar and in the
+      # pagination footer generated from it.
+      - name: Every internal link resolves
+        run: python3 scripts/check_links.py --site _site
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5

@@ -140,8 +140,8 @@ Everything in the data path — identity, guards, authorization, audit — is up
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `DAV_ASK_BASE` | `https://apim:8446/ask` | The ask service through the gateway |
-| `DAV_OM_MCP` | `https://apim:8446/om/mcp` | The catalog, for tier-1 lookups |
+| `DAV_APIM_BASE` + `DAV_ASK_PATH` | `https://apim-emulator:8445` + `/ask` | The ask service through the gateway |
+| `DAV_BACKENDS` | `data-agent` | Which descriptors in `tenapp/backends/` the line loads (§16). A fast lookup's address lives in its descriptor, not here |
 | `DAV_HOST_MODEL` / `DAV_HOST_EFFORT` | `claude-haiku-4-5` / `low` | D4 |
 | `DAV_SPEECH_PROVIDER` | `local` | `local` \| a cloud provider name; the only line that changes for `ENV=prod` |
 | `DAV_ASR_MODEL` / `DAV_TTS_VOICE` | pinned local | Overridden by the cloud provider's own settings |

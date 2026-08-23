@@ -1,0 +1,150 @@
+# data-agent-voice -- the Analyst Line. One compose file, pinned images, the
+# upstream stack consumed over its network and never run from here.
+#
+#   make up                      # ten + tts (laptop, CI)
+#   make up PROFILE=semantic     # + vLLM turn detection (GPU)
+#   make up PROFILE=panel        # + the instrument panel
+#
+# Nothing here is built from a fork. The TEN image is the published build
+# image with this repo's tenapp overlaid (docker/ten/Dockerfile); the
+# extensions it carries are vendored from the pinned tag, each patch an
+# upstream PR (docs/05-ten.md §7).
+
+services:
+  # ----------------------------------------------------------------- ten
+  # The graph runtime: the API server that spawns one worker per session,
+  # and the worker that runs VAD -> ASR -> host -> LLM -> TTS over the
+  # WebSocket transport. Reaches the gateway on the upstream network as the
+  # signed-in user; holds no secret of its own beyond the host model's key.
+  ten:
+    build:
+      context: .
+      dockerfile: docker/ten/Dockerfile
+      args:
+        TEN_VERSION: ${TEN_VERSION:-0.11.71}
+        TEN_BUILD_IMAGE_VERSION: ${TEN_BUILD_IMAGE_VERSION:-0.7.14}
+    platform: linux/amd64
+    env_file: ${ENVFILE:-.env}
+    environment:
+      SERVER_PORT: "8080"
+      WORKERS_MAX: "${WORKERS_MAX:-10}"
+      WORKER_QUIT_TIMEOUT_SECONDS: "${WORKER_QUIT_TIMEOUT_SECONDS:-120}"
+      LOG_STDOUT: "true"
+      # Where the graph's nodes find their neighbours. Names, not addresses:
+      # the same property.json runs everywhere.
+      DAV_TTS_BASE_URL: "http://tts:8880"
+      DAV_TURN_DETECTION_BASE_URL: "http://turn-detection:8000/v1"
+    ports:
+      - "${TEN_API_PORT:-8080}:8080"
+      - "${TEN_WS_PORT:-8765}:8765"
+    depends_on:
+      tts:
+        condition: service_healthy
+    networks:
+      - default
+      - upstream
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    volumes:
+      # faster-whisper pulls its weights on first use; keep them.
+      - asr-models:/root/.cache/huggingface
+
+  # ----------------------------------------------------------------- tts
+  # Local speech synthesis with no account: an OpenAI-compatible
+  # /v1/audio/speech server. The local_tts extension fronts it and also
+  # serves the pre-rendered phrases (docs/05-ten.md §6). CPU image on
+  # purpose; a GPU image is a tag change.
+  tts:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:${KOKORO_VERSION:-v0.8.0}
+    ports:
+      - "${TTS_PORT:-8880}:8880"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8880/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 40s
+
+  # ------------------------------------------------------- turn-detection
+  # Semantic end-of-utterance: a fine-tuned LLM served by vLLM, reached by
+  # ten_turn_detection as an OpenAI-compatible endpoint. TEN's own reference
+  # deployment is an A10 with 14 GB (docs/05-ten.md §2); this is a GPU
+  # profile and CI never starts it. DAV_EOU_MODE=fixed is the default.
+  turn-detection:
+    profiles: [semantic]
+    image: vllm/vllm-openai:${VLLM_VERSION:-v0.27.1}
+    command:
+      - --model
+      - ${TURN_DETECTION_MODEL:-TEN-framework/TEN_Turn_Detection}
+      - --served-model-name
+      - TEN_Turn_Detection
+      - --max-model-len
+      - "2048"
+    ports:
+      - "${TURN_DETECTION_PORT:-8000}:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - turn-models:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+
+  # --------------------------------------------------------------- panel
+  # The instrument panel: per-turn spans, p95s, switch states, the branch
+  # view. Reads the event stream the bridge publishes; stores timings and
+  # event types, never content.
+  panel:
+    profiles: [panel]
+    build:
+      context: ./panel
+    env_file: ${ENVFILE:-.env}
+    ports:
+      - "${PANEL_PORT:-3100}:3100"
+    depends_on:
+      ten:
+        condition: service_healthy
+
+  # --------------------------------------------------------------- tools
+  # Witnesses and the load driver, inside both networks so they reach TEN
+  # and the gateway the way the extensions do. Python 3.12 stdlib, the
+  # family convention; the image is the upstream tools image's shape.
+  tools:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: docker/tools/Dockerfile
+    env_file: ${ENVFILE:-.env}
+    volumes:
+      - ./:/app:rw
+    working_dir: /app
+    networks:
+      - default
+      - upstream
+    depends_on:
+      ten:
+        condition: service_healthy
+
+networks:
+  default:
+  # The upstream stack's network, joined rather than recreated. `make doctor`
+  # fails early and says so when it is absent.
+  upstream:
+    name: ${DAS_STACK_NETWORK:-data-agent-service_default}
+    external: true
+
+volumes:
+  asr-models:
+  turn-models:

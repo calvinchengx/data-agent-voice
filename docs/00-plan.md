@@ -1,6 +1,6 @@
 # Data Agent Voice — Architecture & Implementation Plan
 
-Status: **DRAFT for review — no implementation started.** Last updated 2026-08-23.
+Status: **DRAFT for review — no implementation started.** Last updated 2026-08-23 (upstream ask service landed; §2, §12, §13 revised).
 
 Repo: `~/calvinchengx/emulators/data-agent-voice` · Family tier: **leaf / consumer** — it consumes `data-agent-service`, which consumes the emulators; it emulates nothing · License: Apache-2.0 · Product name inside the repo: **the Analyst Line**.
 
@@ -46,7 +46,8 @@ Inherited from `data-agent-service` and extended by one rule.
 | A question takes **26 s p50, 39–48 s p95**, 6–8 tool calls, Opus 5 at effort `high` on every hop | `data-agent-service` eval reports | The analytical path cannot be on a voice turn. Two loops, async boundary (D1) |
 | Gateway + executor: 23 ms p50 / 70 ms p95; catalog search 61 / 147 ms | `data-agent-service/docs/08-load-testing.md` | A definitional question can be answered in one catalog hop inside the conversational budget — the fast path is real (D3) |
 | The ask contract exists: ticket before any tool call; lossless SSE; `milestone` is structured, not prose; `answer`/`abstention`/`refusal` are three terminal types; `path: catalog\|warehouse\|multi` on every answer; `branch` events from phase 1 | `data-agent-service/agent/contract/`, `docs/20-ask-service.md` | This repo renders; it does not decide. Tiering is a client policy over `path` |
-| The ask service is **contract only** today — `agent/server.py` is not written | same | Phase 0 here builds against a stub; the witness suite is written to the contract |
+| The ask service **exists and is witnessed**: `make conformance-ask` passes 24/24 direct and 24/24 through the gateway's `/ask` route with the model stubbed — tickets, lossless replay, 404-not-403 ownership, idempotent cancel, `done`, and **SSE surviving the gateway** | `data-agent-service` `a9ff497`; `docs/20-ask-service.md` | No stub to build. Phase 0 here targets the real service from the first line. What is *not* yet witnessed upstream: the four behaviour checks (refusal, abstention, `path`, conversation memory) and keep-alives across the gateway's idle timeout on a long stream — both need a model run |
+| Upstream already carries: structured `step`/`milestone` events, conversation `history`, coarse cancellation between hops, prompt caching on the agent's prefix with a rolling breakpoint, and `cache_read_tokens`/`hops` in `done` | same commit | Three of the five asks in §15 are done; the host's TTFT and the panel's cache-hit view have real numbers to read |
 | `DAS_RATE_CALLS=60/60s` per caller, and every sub-agent runs as the same user | `data-agent-service/.env.example` | A voice conversation plus fan-out can throttle itself. Rate tier for the voice caller, or the supervisor front-loads schema so branches do not rediscover it; decided upstream, tracked in §13 |
 | Human turn gap ≈ 200 ms; > 800 ms reads as thinking; > 1.5 s reads as broken | conversation-design literature; **to be measured on this stack** | The budget in §9. Treated as a hypothesis until the panel confirms it |
 | Fixed-silence end-of-utterance costs 500–800 ms; model-based EOU 200–400 ms | TEN turn-detection extension docs, **to confirm at the pinned version** | The single largest non-LLM lever (§10) |
@@ -220,7 +221,7 @@ Every lever is an env flag and a panel delta, because "we optimized latency" is 
 | 5 | `DAV_PRERENDERED_ACK` | synthesize live | pre-rendered wav | 120 ms TTS TTFB → 0 on tier 2 |
 | 6 | `DAV_SPECULATIVE_DISPATCH` | wait for final ASR | dispatch on a confident partial, cancel if wrong | −300 to −500 ms on tier 2; costs tokens on misses |
 | 7 | upstream `DAS_EFFORT` / model per hop | Opus 5 high, every hop | tiered | −8 to −12 s on tier 2 completion — **the biggest number, and not this repo's** |
-| 8 | upstream caching | — | — | −1.5 to −4 s on tier 2; 4–5× input cost |
+| 8 | upstream caching (landed; `done.cache_read_tokens` reports it) | — | — | −1.5 to −4 s on tier 2; 4–5× input cost |
 | 9 | upstream fan-out | one branch | one per source | Coverage and visibility, **not** speed; −1 to −3 s where discovery was serial |
 
 Rows 7–9 are upstream and appear here so the panel can show them and the docs can be honest about where the seconds come from. The perceived-latency levers (1–6) are this repo's; the completion-latency levers (7–9) are not.
@@ -254,18 +255,17 @@ Rows 7–9 are upstream and appear here so the panel can show them and the docs 
 
 | # | Phase | Delivers | Done when | Depends on |
 |---|---|---|---|---|
-| 0 | Contract stub + witnesses | A stub ask service emitting the phase-1 event sequence; the witness harness; the panel reading timings | witnesses run red against the stub | upstream contract (written) |
+| 0 | Stack + witnesses | Compose consuming `data-agent-service` by image with the `ask` profile on; the witness harness; the panel reading timings; `make up` / `make doctor` / `make status` | witnesses run red against the real service | upstream `a9ff497` (landed) |
 | 1 | Tier 0/1 line | TEN graph, host, local speech, catalog lookups; tier 2 says "I can't do that yet" | onset witness green; definitional answers in < 2 s | — |
-| 2 | Tier 2 dispatch | `das_bridge`, milestones, answer rendering, fixed phrases | refusal + abstention + tiers witnesses green against the stub | — |
-| 3 | Against the real ask service | Same, against upstream `agent/server.py` | the same witnesses green, no change here | **upstream `server.py`** |
-| 4 | Barge-in + cancel | Flush, abort, `cancel` | barge-in witness green | upstream coarse cancellation |
-| 5 | Switches + panel | Every §10 1–6 switch wired; deltas measured and written into §9 | switches witness green; §9 rewritten with measurements | — |
-| 6 | Entity confirmation | D12 | confirm witness green | — |
-| 7 | Fan-out visible | Branch view in the panel | branches witness green | upstream phase-2 fan-out |
-| 8 | Prod | cloud speech by `.env`; `ENV=prod` run | prod witness green; `parity.md` Azure column | upstream prod |
-| 9 | Telephony | a phone number in front of the same graph | same witnesses over PSTN | external provider |
+| 2 | Tier 2 dispatch | `das_bridge` on the real `/ask` route, milestones, answer rendering, fixed phrases | refusal + abstention + tiers witnesses green | upstream behaviour checks green (a model run) |
+| 3 | Barge-in + cancel | Flush, abort, `cancel` | barge-in witness green | upstream coarse cancellation (landed) |
+| 4 | Switches + panel | Every §10 1–6 switch wired; deltas measured and written into §9 | switches witness green; §9 rewritten with measurements | — |
+| 5 | Entity confirmation | D12 | confirm witness green | — |
+| 6 | Fan-out visible | Branch view in the panel | branches witness green | upstream phase-2 fan-out |
+| 7 | Prod | cloud speech by `.env`; `ENV=prod` run | prod witness green; `parity.md` Azure column | upstream prod |
+| 8 | Telephony | a phone number in front of the same graph | same witnesses over PSTN | external provider |
 
-Phases 0–2 are the demo. 3–6 make it the one described here. 7–9 are new scope.
+Phases 0–2 are the demo. 3–5 make it the one described here. 6–8 are new scope.
 
 ---
 
@@ -275,12 +275,13 @@ Phases 0–2 are the demo. 3–6 make it the one described here. 7–9 are new s
 |---|---|---|
 | **ASR upstream of every guard**: a perfectly-formed query about the wrong entity passes every check | certain | D12; the confirm witness; say it in the docs as the new error class it is |
 | The voice caller throttles itself on `DAS_RATE_CALLS` once fan-out lands | high at demo N | Decide upstream: a rate tier for the voice app role, or the supervisor front-loads schema. Tracked as an upstream proposal, not changed here |
-| The 800 ms budget is literature, not this stack | medium | Phase 5 measures; §9 is rewritten from the panel, not defended |
+| The 800 ms budget is literature, not this stack | medium | Phase 4 measures; §9 is rewritten from the panel, not defended |
 | TEN extension API at the pinned version differs from what §5 assumes | medium | Pin first; `docs/05-ten.md` records what was actually true; findings here marked **to confirm** until then |
 | Local speech models are the one large artefact | certain | Pulled at `make up`, cached, never committed; sizes in `make doctor` |
 | Re-auth mid-call has no good UX | certain | Say so; the host asks for sign-in again; a long-session design is out of scope |
 | Model-generated narration creeps back in because it sounds better | high | D8 and D9 are witnesses, not guidance; a template that sounds wrong is fixed in `phrases/` |
-| Upstream `server.py` slips and phase 3 waits | medium | Phases 0–2 run against the stub and are a complete demo of the conversational design on their own |
+| Upstream's behaviour checks have not run, so `definitions_applied` may arrive empty and the refusal/abstention split is proved only in-process | medium | Phase 2 waits for that run; phase 1 does not depend on it. A field the bridge renders must be one upstream has witnessed |
+| A long stream's keep-alives across the gateway's idle timeout are unwitnessed | medium | The first real-model run upstream shows it; if the gateway drops a quiet stream, the bridge's lossless reconnect (`Last-Event-ID`) is the designed answer, not a workaround |
 | The demo's most compelling variant — "what does this look like to a reader-only?" — cannot be built, because the app holds one user's token and cannot obtain another's | certain | Documented as a feature of the design, not a gap: the demo that is impossible is the property being demonstrated |
 
 ---
@@ -309,9 +310,9 @@ Proposed in `data-agent-service`, not built here, each one passing the "would a 
 
 | Ask | Why a voice client is merely the first to need it |
 |---|---|
-| `agent/server.py` — the ask service | Every asynchronous client |
-| Coarse cancellation between hops | Any client whose user has gone |
-| Prompt caching on the agent's prefix | Cost, for every client |
+| ~~`agent/server.py` — the ask service~~ **landed** | Every asynchronous client |
+| ~~Coarse cancellation between hops~~ **landed** | Any client whose user has gone |
+| ~~Prompt caching on the agent's prefix~~ **landed** | Cost, for every client |
 | Per-hop model and effort | Completion latency, for every client |
 | A rate tier for an application role, or schema front-loading before fan-out | Any client that asks more than one question a minute |
 

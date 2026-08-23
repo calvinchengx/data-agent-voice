@@ -1,0 +1,4 @@
+ten_packages/
+.release/
+bin/
+phrases/*.wav

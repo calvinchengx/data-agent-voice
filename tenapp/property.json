@@ -1,0 +1,169 @@
+{
+  "ten": {
+    "predefined_graphs": [
+      {
+        "name": "analyst_line",
+        "auto_start": false,
+        "graph": {
+          "nodes": [
+            {
+              "type": "extension",
+              "name": "transport",
+              "addon": "websocket_server",
+              "property": { "host": "0.0.0.0", "port": 8765 }
+            },
+            {
+              "type": "extension",
+              "name": "vad",
+              "addon": "ten_vad_python",
+              "property": {}
+            },
+            {
+              "type": "extension",
+              "name": "stt",
+              "addon": "whisper_stt_python",
+              "property": {
+                "params": {
+                  "model": "${env:DAV_ASR_MODEL|base}",
+                  "compute_type": "${env:DAV_ASR_COMPUTE|int8}",
+                  "language": "en",
+                  "vad_filter": true
+                }
+              }
+            },
+            {
+              "type": "extension",
+              "name": "turn_detection",
+              "addon": "ten_turn_detection",
+              "property": {
+                "base_url": "${env:DAV_TURN_DETECTION_BASE_URL|http://turn-detection:8000/v1}",
+                "force_threshold_ms": 5000
+              }
+            },
+            {
+              "type": "extension",
+              "name": "host",
+              "addon": "das_host",
+              "property": {
+                "greeting": "Analyst line. What would you like to know?",
+                "eou_mode": "${env:DAV_EOU_MODE|fixed}",
+                "tts_chunk": "${env:DAV_TTS_CHUNK|sentence}",
+                "prerendered_ack": "${env:DAV_PRERENDERED_ACK|true}",
+                "speculative_dispatch": "${env:DAV_SPECULATIVE_DISPATCH|false}",
+                "confirm_entities": "${env:DAV_CONFIRM_ENTITIES|true}"
+              }
+            },
+            {
+              "type": "extension",
+              "name": "llm",
+              "addon": "anthropic_llm2_python",
+              "property": {
+                "api_key": "${env:ANTHROPIC_API_KEY}",
+                "model": "${env:DAV_HOST_MODEL|claude-haiku-4-5}",
+                "effort": "${env:DAV_HOST_EFFORT|low}",
+                "max_tokens": 1024,
+                "thinking_display": "omitted",
+                "refusal_fallback": true,
+                "refusal_message": "I can't answer that one.",
+                "prompt": "You are the voice of a governed data service. You never answer a question about data yourself: you look up a definition with glossary_lookup, or you hand the question to dispatch and say you are working on it. Speak one or two short sentences. Never read out a table, a row count, or SQL. If you are unsure which team, table, or metric was said, call confirm before anything else."
+              }
+            },
+            {
+              "type": "extension",
+              "name": "tools",
+              "addon": "das_tools",
+              "property": {
+                "apim_base": "${env:DAV_APIM_BASE|https://apim-emulator:8445}",
+                "ask_path": "${env:DAV_ASK_PATH|/ask}",
+                "om_mcp_path": "${env:DAV_OM_MCP_PATH|/om/mcp}",
+                "tls_insecure": "${env:DAV_TLS_INSECURE|true}"
+              }
+            },
+            {
+              "type": "extension",
+              "name": "bridge",
+              "addon": "das_bridge",
+              "property": {
+                "apim_base": "${env:DAV_APIM_BASE|https://apim-emulator:8445}",
+                "ask_path": "${env:DAV_ASK_PATH|/ask}",
+                "tls_insecure": "${env:DAV_TLS_INSECURE|true}"
+              }
+            },
+            {
+              "type": "extension",
+              "name": "tts",
+              "addon": "local_tts",
+              "property": {
+                "params": {
+                  "base_url": "${env:DAV_TTS_BASE_URL|http://tts:8880}",
+                  "voice": "${env:DAV_TTS_VOICE|af_heart}",
+                  "sample_rate": 24000
+                },
+                "phrases_dir": "/app/agents/analyst_line/tenapp/phrases"
+              }
+            }
+          ],
+          "connections": [
+            {
+              "extension": "transport",
+              "audio_frame": [
+                { "name": "pcm_frame", "dest": [{ "extension": "vad" }, { "extension": "stt" }] }
+              ]
+            },
+            {
+              "extension": "vad",
+              "data": [{ "name": "vad_result", "dest": [{ "extension": "host" }] }]
+            },
+            {
+              "extension": "stt",
+              "data": [
+                { "name": "asr_result", "dest": [{ "extension": "host" }, { "extension": "turn_detection" }] }
+              ]
+            },
+            {
+              "extension": "turn_detection",
+              "data": [{ "name": "text_data", "dest": [{ "extension": "host" }] }],
+              "cmd": [{ "names": ["flush"], "dest": [{ "extension": "host" }] }]
+            },
+            {
+              "extension": "host",
+              "cmd": [
+                { "names": ["tool_register"], "dest": [{ "extension": "llm" }] },
+                { "names": ["flush"], "dest": [{ "extension": "llm" }, { "extension": "tts" }, { "extension": "transport" }] }
+              ],
+              "data": [
+                { "name": "text_data", "dest": [{ "extension": "llm" }] },
+                { "name": "tts_text_input", "dest": [{ "extension": "tts" }] }
+              ]
+            },
+            {
+              "extension": "llm",
+              "data": [{ "name": "text_data", "dest": [{ "extension": "host" }] }],
+              "cmd": [{ "names": ["tool_call"], "dest": [{ "extension": "tools" }] }]
+            },
+            {
+              "extension": "tools",
+              "cmd": [
+                { "names": ["tool_register"], "dest": [{ "extension": "host" }] },
+                { "names": ["ask_dispatched"], "dest": [{ "extension": "bridge" }] }
+              ]
+            },
+            {
+              "extension": "bridge",
+              "data": [
+                { "name": "tts_text_input", "dest": [{ "extension": "tts" }] },
+                { "name": "text_data", "dest": [{ "extension": "transport" }] }
+              ],
+              "cmd": [{ "names": ["ask_cancel"], "source": [{ "extension": "host" }] }]
+            },
+            {
+              "extension": "tts",
+              "audio_frame": [{ "name": "pcm_frame", "dest": [{ "extension": "transport" }] }],
+              "data": [{ "name": "text_data", "dest": [{ "extension": "transport" }] }]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

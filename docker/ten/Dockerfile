@@ -1,0 +1,150 @@
+# syntax=docker/dockerfile:1.7
+#
+# The Analyst Line's TEN image, multi-arch.
+#
+#   docker buildx build --platform linux/amd64,linux/arm64 -f docker/ten/Dockerfile .
+#
+# TEN publishes its build image for amd64 only, and its package registry
+# serves the runtime as `linux/x64` alone -- so `tman install` cannot resolve
+# a runtime on arm64 at all (docs/05-ten.md §8). But the release assets at the
+# same tag DO include `ten_packages-linux-arm64-gcc-release.zip` and
+# `tman-linux-release-arm64.zip`, carrying ten_runtime, ten_runtime_python and
+# ten_runtime_go built for aarch64. So the two legs differ only in where the
+# runtime comes from:
+#
+#   amd64  -- TEN's published build image, then `tman install`. The path
+#             upstream tests, and the one to trust when the two disagree.
+#   arm64  -- ubuntu:22.04 plus the release assets unpacked into place, with
+#             `tman install --standalone` for the pure-Python packages only.
+#
+# Everything after that is identical, so a bug that reproduces on one leg and
+# not the other is a runtime-build difference and belongs in
+# docs/upstream-issues.md rather than being worked around here.
+
+ARG TEN_VERSION=0.11.71
+ARG TEN_BUILD_IMAGE_VERSION=0.7.14
+
+# --------------------------------------------------------------- sources --
+# The framework at the pin, for the stock extensions and the Go API server.
+# Cloned rather than vendored into this repo: the tag IS the pin, a clone is
+# reviewable by diffing against it, and only PATCHED extensions need to live
+# in this repo (extensions/vendor/, docs/05-ten.md §7).
+FROM alpine/git:2.45.2 AS ten-src
+ARG TEN_VERSION
+WORKDIR /src
+RUN git clone --depth 1 --branch ${TEN_VERSION} \
+      https://github.com/TEN-framework/ten-framework.git ten \
+ && rm -rf ten/.git
+
+# ------------------------------------------------------- builder (amd64) --
+FROM ghcr.io/ten-framework/ten_agent_build:${TEN_BUILD_IMAGE_VERSION} AS builder-amd64
+ARG TEN_VERSION
+ENV TEN_ARCH_SOURCE=registry
+
+# ------------------------------------------------------- builder (arm64) --
+# The same toolchain the published image has, assembled for aarch64, plus the
+# runtime unpacked from the release. Versions match
+# tools/docker_for_building/ubuntu/22.04/Dockerfile at the tag.
+FROM ubuntu:22.04 AS builder-arm64
+ARG TEN_VERSION
+ENV TEN_ARCH_SOURCE=release
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential clang cmake curl unzip zip git jq ca-certificates \
+      libasound2-dev libgstreamer1.0-dev libunwind-dev libssl-dev libc++1 \
+      python3 python3-dev python3-pip python3-venv \
+ && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSLO https://go.dev/dl/go1.22.3.linux-arm64.tar.gz \
+ && tar -C /usr/local -xzf go1.22.3.linux-arm64.tar.gz \
+ && rm go1.22.3.linux-arm64.tar.gz
+ENV PATH="/usr/local/go/bin:${PATH}"
+# tman and the aarch64 runtime, from the release assets at the same tag.
+RUN set -eux; \
+    base="https://github.com/TEN-framework/ten-framework/releases/download/${TEN_VERSION}"; \
+    curl -fsSLo /tmp/tman.zip "$base/tman-linux-release-arm64.zip"; \
+    unzip -q /tmp/tman.zip -d /tmp/tman; \
+    install -m 0755 /tmp/tman/ten_manager/bin/tman /usr/local/bin/tman; \
+    curl -fsSLo /tmp/pkgs.zip "$base/ten_packages-linux-arm64-gcc-release.zip"; \
+    mkdir -p /opt/ten_arm64; \
+    unzip -q /tmp/pkgs.zip -d /opt/ten_arm64; \
+    rm -rf /tmp/tman.zip /tmp/tman /tmp/pkgs.zip; \
+    test -f /opt/ten_arm64/ten_packages/system/ten_runtime_python/lib/libten_runtime_python.so
+
+# ---------------------------------------------------------------- build --
+# TARGETARCH picks the leg; everything below is arch-neutral.
+FROM builder-${TARGETARCH} AS build
+ARG TEN_VERSION
+ARG TARGETARCH
+WORKDIR /app
+
+COPY --from=ten-src /src/ten/ai_agents/server/            server/
+COPY --from=ten-src /src/ten/ai_agents/agents/scripts/    agents/scripts/
+COPY --from=ten-src /src/ten/ai_agents/agents/ten_packages/ agents/ten_packages/
+
+# This repo's own extensions, then any patched stock ones on top. A vendored
+# extension always shadows its upstream namesake, and `make vendor-check`
+# fails if it differs from the tag without a VENDORED file naming the PR.
+COPY extensions/            agents/ten_packages/extension/
+COPY tenapp/                agents/analyst_line/tenapp/
+
+WORKDIR /app/agents/analyst_line/tenapp
+RUN set -eux; \
+    if [ "$TEN_ARCH_SOURCE" = "release" ]; then \
+      # The registry has no aarch64 runtime; place it, then let tman resolve
+      # only what is left (ten_ai_base is pure Python and arch-neutral --
+      # its `supports` list at the tag is empty).
+      mkdir -p ten_packages; \
+      cp -a /opt/ten_arm64/ten_packages/. ten_packages/; \
+      tman install --standalone || tman install; \
+    else \
+      tman install; \
+    fi; \
+    test -d ten_packages/system/ten_runtime_python
+
+# Python dependencies for every extension the graph loads.
+RUN bash /app/agents/scripts/install_python_deps.sh 2>/dev/null \
+ || find ten_packages/extension -name requirements.txt -exec pip3 install --no-cache-dir -r {} \;
+
+# The Go API server: /start spawns one worker per session.
+WORKDIR /app/server
+RUN go build -o bin/api ./cmd/api 2>/dev/null || go build -o bin/api .
+
+# Package what the runtime image needs.
+WORKDIR /app/agents/analyst_line/tenapp
+RUN tman package --output-path /tmp/app.tar 2>/dev/null || true
+
+# --------------------------------------------------------------- runtime --
+FROM ubuntu:22.04
+ARG TEN_VERSION
+LABEL org.opencontainers.image.title="data-agent-voice / analyst-line" \
+      org.opencontainers.image.description="TEN graph for the Analyst Line: WebSocket in, local ASR/TTS, Claude host, the ask service behind it" \
+      org.opencontainers.image.source="https://github.com/calvinchengx/data-agent-voice" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      com.calvinchengx.ten.version="${TEN_VERSION}"
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libasound2 libgstreamer1.0-dev libunwind-dev libc++1 libssl-dev \
+      python3 python3-pip python3-venv ca-certificates curl jq \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=build /app/agents/    agents/
+COPY --from=build /app/server/bin/api server/bin/api
+COPY --from=build /usr/local/lib  /usr/local/lib
+COPY --from=build /usr/local/bin/tman /usr/local/bin/tman
+RUN ldconfig
+
+# faster-whisper's weights are pulled on first use into this cache, which
+# compose keeps in a volume: a cold start downloads, a restart does not.
+ENV HF_HOME=/root/.cache/huggingface \
+    PYTHONUNBUFFERED=1 \
+    SERVER_PORT=8080
+
+EXPOSE 8080 8765
+HEALTHCHECK --interval=10s --timeout=5s --retries=18 --start-period=30s \
+  CMD curl -fsS http://localhost:${SERVER_PORT}/health || exit 1
+
+# Never `bin/worker` directly, and never the binary without the tenapp dir --
+# the server needs it to find the graph (docs/ai/L1/07_gotchas.md).
+CMD ["/app/server/bin/api", "-tenapp_dir=/app/agents/analyst_line/tenapp"]

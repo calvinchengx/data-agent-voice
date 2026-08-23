@@ -10,7 +10,9 @@ and these tests are mostly about the paths that LOOK like documentation.
 from __future__ import annotations
 
 import importlib.util
+import os
 import pathlib
+import subprocess
 import sys
 
 import pytest
@@ -97,7 +99,41 @@ def test_the_workflow_treats_only_the_word_docs_as_a_skip():
     assert "needs.changes.outputs.code == 'true'" in workflow
 
 
-def test_the_gate_runs_against_this_repository_without_error():
-    """It shells out to git; a signature change or a missing binary would fail
-    here rather than in CI."""
-    assert gate.changed_since("HEAD~1") is not None
+def test_the_gate_reads_a_real_diff_from_git(tmp_path):
+    """It shells out to git, so the git half is exercised against a repository
+    built here rather than against this one: CI checks out shallow, `HEAD~1`
+    does not exist there, and a test that assumed a full clone failed in CI
+    while passing on every laptop. Which is the failure this gate itself is
+    meant to be careful about, arriving from the other direction."""
+
+    def run(*a):
+        subprocess.run(a, cwd=tmp_path, check=True, capture_output=True)
+
+    run("git", "init", "-q")
+    run("git", "config", "user.email", "t@example.com")
+    run("git", "config", "user.name", "t")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.md").write_text("one")
+    run("git", "add", "-A")
+    run("git", "commit", "-qm", "first")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    (tmp_path / "docs" / "a.md").write_text("two")
+    (tmp_path / "code.py").write_text("x = 1")
+    run("git", "add", "-A")
+    run("git", "commit", "-qm", "second")
+
+    here = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        changed = gate.changed_since(base)
+    finally:
+        os.chdir(here)
+    assert sorted(changed) == ["code.py", "docs/a.md"]
+    assert not gate.is_docs_only(changed)
+
+
+def test_a_commit_that_is_not_in_a_shallow_clone_reads_as_unknown(tmp_path):
+    """And unknown runs everything, which is the whole point."""
+    assert gate.changed_since("0" * 40) is None

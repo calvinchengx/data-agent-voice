@@ -51,6 +51,7 @@ The full argument, with the numbers behind it, is in
 | [`docs/00-plan.md`](docs/00-plan.md) | Architecture, decisions, phases, the latency budget, risks |
 | [`docs/05-ten.md`](docs/05-ten.md) | TEN at the pinned tag, read from the source — including what it does *not* do |
 | [`docs/parity.md`](docs/parity.md) | What is witnessed, and what is not |
+| [`docs/06-ci.md`](docs/06-ci.md) | What CI runs and when — a documentation change skips the nine minutes of image builds |
 | `tenapp/` | The TEN app: the `analyst_line` graph, and one descriptor per backend |
 | `docker/ten/` | The image, multi-arch — arm64 from the release assets, since the registry has none |
 | `tests/` | The configuration held to itself: 158 checks, run by `make test` |

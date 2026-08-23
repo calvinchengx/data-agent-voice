@@ -14,6 +14,7 @@ docs/parity.md says so rather than letting a green suite imply it.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import pathlib
 import re
@@ -28,9 +29,14 @@ MANIFEST = json.loads((TENAPP / "manifest.json").read_text())
 ENV_EXAMPLE = (ROOT / ".env.example").read_text()
 PLAN = (ROOT / "docs" / "00-plan.md").read_text()
 
-# The extensions this repo writes, as opposed to the ones it takes from the
-# pinned tag. Anything else the graph names must exist upstream.
-OURS = {"das_host", "das_tools", "das_bridge", "local_tts"}
+# The extensions this repository writes, as opposed to the ones it takes from
+# the pinned tag. Read from the file the CI image gate also reads, so the two
+# cannot drift into disagreeing about what "written" means.
+OURS = {
+    line.strip()
+    for line in (ROOT / "extensions" / "OWNED").read_text().splitlines()
+    if line.strip() and not line.startswith("#")
+}
 
 
 def env_keys(text: str) -> set[str]:
@@ -200,3 +206,23 @@ def test_the_readme_points_at_a_plan_that_exists():
     readme = (ROOT / "README.md").read_text()
     for link in re.findall(r"\]\((docs/[^)#]+)", readme):
         assert (ROOT / link).exists(), link
+
+
+def test_every_extension_this_repo_owns_is_named_by_the_graph():
+    """A file in OWNED that the graph never loads is dead weight; an addon the
+    graph names that is in neither OWNED nor the pinned tag fails at
+    `tman install`, in a container, minutes into a build."""
+    named = {n["addon"] for n in NODES.values()}
+    assert not OURS - named, f"owned but unused: {sorted(OURS - named)}"
+
+
+def test_the_image_gate_agrees_with_what_is_written():
+    """`make test` passing while CI silently skips the image build would hide
+    exactly the state this repository is in."""
+    ready = importlib.util.spec_from_file_location(
+        "image_ready", ROOT / "scripts" / "image_ready.py"
+    )
+    module = importlib.util.module_from_spec(ready)
+    ready.loader.exec_module(module)
+    written = {n for n in OURS if (ROOT / "extensions" / n / "manifest.json").is_file()}
+    assert (module.main() == 0) == (written == OURS)

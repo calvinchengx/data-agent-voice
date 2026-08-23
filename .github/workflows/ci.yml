@@ -68,17 +68,22 @@ jobs:
       # moment the first extension lands, which is when its answer becomes
       # worth having. docs/parity.md records the build as not run either way.
       #
+      # "Any extension exists" was the wrong question: the build needs EVERY
+      # one the graph names, so a partly-written repository started building
+      # and failed. scripts/image_ready.py asks the precise question and names
+      # what is missing.
+      #
       # A step rather than a job-level `if`, because `hashFiles` reads the
       # workspace and at job level is evaluated before checkout -- so it saw
       # an empty tree and the whole workflow failed to parse the condition.
       - id: ready
         shell: bash
         run: |
-          if compgen -G "extensions/*/manifest.json" > /dev/null; then
+          if reason=$(python3 scripts/image_ready.py); then
             echo "build=true" >> "$GITHUB_OUTPUT"
           else
             echo "build=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Image not built::extensions/ holds no extension yet; the graph names four that are not written. See docs/parity.md."
+            echo "::notice title=Image not built::$reason — the graph names extensions this repository has not written yet. See docs/parity.md."
           fi
       - if: steps.ready.outputs.build == 'true'
         uses: docker/setup-qemu-action@v3

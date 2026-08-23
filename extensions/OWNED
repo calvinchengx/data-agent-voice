@@ -1,0 +1,11 @@
+# The extensions this repository writes, one per line. Stock ones come from
+# the pinned TEN tag at image build time and are not listed here.
+#
+# One file rather than two lists: the CI gate reads it to decide whether the
+# image can build at all, and tests/test_structure.py reads it to check the
+# graph names nothing that exists in neither place. A name here with no
+# directory is the state the gate exists to detect.
+das_host
+das_tools
+das_bridge
+local_tts

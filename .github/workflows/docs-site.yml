@@ -59,6 +59,11 @@ jobs:
           mkdir -p _site
           cp site/index.html _site/index.html
           cp -R website/dist _site/docs
+          # llms.txt at the SITE root, which is where the convention says to
+          # look. sync-docs writes it into website/public/, which Astro copies
+          # to the root of the BUILT site, and this site is based at
+          # /data-agent-voice/docs/, so that lands one level too deep.
+          cp website/dist/llms.txt _site/llms.txt
       # Badge endpoints README.md reads back through shields.io. The number
       # comes from docs/witnesses.json, which a real run writes and the stack
       # job re-verifies -- so a stale badge fails CI rather than lying here.

@@ -1,0 +1,16 @@
+# Data Agent Voice
+
+> The Analyst Line: ask your governed data in English, out loud, and hear the answer with the definition it applied. A voice front end over data-agent-service on the TEN framework. No audio has been through it yet; the parity ledger says which rows are red.
+
+## Documentation
+
+- [Data Agent Voice — Architecture & Implementation Plan](https://calvinchengx.github.io/data-agent-voice/docs/00-plan/): Status: DRAFT for review — no implementation started. Last updated 2026-08-23 (TEN pinned at 0.11.71 — see docs/05-ten.md; §16 added: backends are…
+- [Quickstart](https://calvinchengx.github.io/data-agent-voice/docs/01-quickstart/): make doctor is the one to read. It checks the things that actually stop a first run: whether the upstream stack is up, whether its ask service is healthy,…
+- [Architecture](https://calvinchengx.github.io/data-agent-voice/docs/02-architecture/): understands, acknowledges, answers what it can from metadata, and dispatches the rest. It never blocks on anything slower than a catalog hop.
+- [Latency](https://calvinchengx.github.io/data-agent-voice/docs/03-latency/): Four numbers, and only one of them is felt.
+- [Tiers, and what the host may say](https://calvinchengx.github.io/data-agent-voice/docs/04-tiers/): Three tiers, decided by which tool the model reached for — not by a classifier. A classifier would be a second model call on the one path that cannot afford…
+- [TEN, as it actually is at 0.11.71](https://calvinchengx.github.io/data-agent-voice/docs/05-ten/): Read from the tag, not the marketing. Every row names the file it came from, so a claim here can be re-checked when the pin moves.
+- [What is checked, and what that is worth](https://calvinchengx.github.io/data-agent-voice/docs/06-witnesses/): 159 checks run on every push. None of them can tell you the line works — only a call does that, and parity.md keeps those rows red.
+- [What CI runs, and when](https://calvinchengx.github.io/data-agent-voice/docs/07-ci/): Two workflows, and a deliberate asymmetry between them: the checks that are cheap always run; the ones that cost minutes run only when something they could…
+- [Parity — what is witnessed, and where](https://calvinchengx.github.io/data-agent-voice/docs/parity/): Two columns, because they are different claims. Witnessed locally means a check in this repo runs and passes; the check is named, so a green row can always…
+- [Upstream issues](https://calvinchengx.github.io/data-agent-voice/docs/upstream-issues/): Suspected bugs and rough edges in dependencies, written up rather than worked around silently.

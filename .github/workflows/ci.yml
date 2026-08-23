@@ -56,6 +56,12 @@ jobs:
   image:
     name: The image builds, on both architectures
     runs-on: ubuntu-latest
+    # Skipped, visibly, until the four extensions the graph names exist: the
+    # build cannot succeed without them and a job that is red on every push
+    # teaches people to stop reading CI. It starts running by itself the
+    # moment the first extension lands, which is when its answer becomes
+    # worth having. docs/parity.md records the build as not run either way.
+    if: hashFiles('extensions/*/manifest.json') != ''
     # The arm64 leg is assembled from the release assets rather than the
     # registry, which serves linux/x64 only (docs/05-ten.md §8). It is slow
     # and it is the one that will break first, so it runs here rather than

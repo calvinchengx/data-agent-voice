@@ -68,23 +68,33 @@ def main() -> int:
         print(f"FAIL: {MANIFEST} records {total} witnesses, so the badge would lie.")
         return 1
 
-    # The front page states the witness count in prose. A number on the most
-    # read page in the repository is exactly the kind of claim that goes quietly
-    # stale -- it said 77 while the suite witnessed 88 -- so it is checked here
-    # against the same manifest the badge is built from.
+    # The front page READS the count; it does not state it. Checking a typed
+    # number against the manifest was the previous design, and it fails in two
+    # ways this does not: the number goes stale between the run and the edit,
+    # and the check only ever saw ONE of the two places this page states the
+    # total -- the stat tile was unguarded and could drift freely.
+    #
+    # So the check is now about the mechanism, not the value: no typed number,
+    # and the page must still read the manifest published beside it.
     if args.landing:
         page = pathlib.Path(args.landing)
         if not page.exists():
             print(f"FAIL: {page} does not exist.")
             return 1
-        stated = re.search(r"<b>(\d+)</b><span>end-to-end witnesses", page.read_text())
-        if not stated:
-            print(f"FAIL: {page} no longer states a witness count where one was expected.")
-            return 1
-        if int(stated.group(1)) != total:
+        text = page.read_text()
+        typed = re.search(
+            r"<b>(\d+)</b><span>\s*(?:end-to-end witnesses|checks on the design)", text
+        )
+        if typed:
             print(
-                f"FAIL: {page} claims {stated.group(1)} witnesses, the manifest records "
-                f"{total}. Update the page."
+                f"FAIL: {page} hardcodes {typed.group(1)} witnesses. The page reads "
+                f"witnesses-manifest.json at run time; a typed number goes stale."
+            )
+            return 1
+        if "data-witness-total" not in text or "witnesses-manifest.json" not in text:
+            print(
+                f"FAIL: {page} no longer reads witnesses-manifest.json — the front page "
+                f"would show an em dash and never fill it."
             )
             return 1
 
@@ -94,6 +104,11 @@ def main() -> int:
     (out / "witnesses.json").write_text(
         json.dumps(badge("witnesses", f"{passed}/{total}", colour)) + "\n"
     )
+    # The manifest itself, beside the badge. The badge is shields.io's schema --
+    # a label and a message string -- and a page parsing "130/130" out of it
+    # would break silently the day the label changed. The landing page reads
+    # this instead, where `total` means what it says.
+    (out / "witnesses-manifest.json").write_text(MANIFEST.read_text())
 
     # The coverage badges README.md points at. They are emitted here, from a
     # committed manifest, because the docs site never runs a test suite -- and

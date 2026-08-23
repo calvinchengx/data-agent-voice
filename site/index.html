@@ -80,7 +80,7 @@ a{color:var(--accent)}
     <div class="stat"><b>26s</b><span>median, one question</span></div>
     <div class="stat"><b>~800ms</b><span>before it feels slow</span></div>
     <div class="stat"><b>30×</b><span>the gap</span></div>
-    <div class="stat"><b>130</b><span>checks on the design</span></div>
+    <div class="stat"><b data-witness-total>&mdash;</b><span>checks on the design</span></div>
   </div>
   <p>No faster model closes that. So this does not try to: the conversation stops waiting.</p>
   <ul>
@@ -106,7 +106,7 @@ a{color:var(--accent)}
 <section>
   <h2>What is actually true today</h2>
   <div class="note">
-    <p><b>No audio has ever been through this.</b> Four extensions the graph names are not written yet. What exists is the architecture, the pinned framework read from its source, a multi-arch image, the graph, and <b>130</b><span>end-to-end witnesses</span> holding the configuration to itself.</p>
+    <p><b>No audio has ever been through this.</b> Four extensions the graph names are not written yet. What exists is the architecture, the pinned framework read from its source, a multi-arch image, the graph, and <b data-witness-total>&mdash;</b><span>end-to-end witnesses</span> holding the configuration to itself.</p>
     <p style="margin:0">Every row of <a href="docs/parity/">the ledger</a> that describes a working line reads <code>not run</code>. That is the point of keeping one.</p>
   </div>
 </section>
@@ -128,5 +128,29 @@ make status   # is the line usable?</code></pre>
 </footer>
 
 </div>
+<script>
+  // The counts are read from the manifest a real run writes, published beside
+  // this page by the docs-site workflow. Typed numbers on this page went stale
+  // three times in one day in the sibling repository, because witnesses are
+  // added faster than anyone remembers where the total is written down --
+  // see data-agent-service's site/index.html, which this follows.
+  //
+  // Every occurrence is filled, not one: this page states the total TWICE, and
+  // the checker that used to guard it could only see the second. A number the
+  // guard cannot see is a number that drifts.
+  //
+  // The fallback is an em dash, not a number: if the manifest cannot be read
+  // the page should say nothing rather than something possibly untrue.
+  fetch('witnesses-manifest.json')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d || !d.total) { return; }
+      Array.prototype.forEach.call(
+        document.querySelectorAll('[data-witness-total]'),
+        function (el) { el.textContent = d.total; }
+      );
+    })
+    .catch(function () { /* the em dash stands */ });
+</script>
 </body>
 </html>

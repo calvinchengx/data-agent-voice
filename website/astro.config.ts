@@ -38,7 +38,7 @@ export default defineConfig({
         {
           // Living ledgers rather than chapters: a reader looks things up here.
           label: 'Reference',
-          items: [{ slug: 'parity' }],
+          items: [{ slug: 'parity' }, { slug: 'upstream-issues' }],
         },
       ],
     }),

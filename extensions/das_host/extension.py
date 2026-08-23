@@ -46,6 +46,7 @@ from .agent.events import (
 )
 from .config import HostConfig
 from .helper import _send_cmd, _send_data, parse_sentences
+from .turn import confirmation_hint, is_confident_partial, uncertain_terms
 
 # What the bridge sends back, and what each becomes when spoken.
 FIXED = {"refusal": "refusal_phrase", "abstention": "abstention_phrase", "error": "error_phrase"}
@@ -68,6 +69,9 @@ class DasHostExtension(AsyncExtension):
         # Turn-taking state. `speaking` is ours; `caller_speaking` is theirs.
         self.speaking = False
         self.caller_speaking = False
+        # One speculative dispatch per turn: a partial grows word by word and
+        # every growth looks like a new chance to guess.
+        self.speculated = False
         # Answers that arrived while somebody was talking.
         self.held: list[tuple[str, str]] = []
         self.pending_asks: set[str] = set()
@@ -147,16 +151,35 @@ class DasHostExtension(AsyncExtension):
 
         if event.final:
             self.caller_speaking = False
+            self.speculated = False
             # In semantic mode the turn-detection node decides when a turn has
             # ended, and a final transcript is only evidence. In fixed mode
             # this IS the decision (docs/00-plan.md §10-1).
             if not self.config.trust_turn_detection:
-                await self._take_turn(event.text)
+                await self._take_turn(event.text, event.metadata)
+        elif self.config.speculative_dispatch and not self.speculated:
+            # Switch #6: start on a partial that is already a whole question,
+            # to save the three or four hundred milliseconds spent waiting for
+            # a final transcript. Off by default -- it spends tokens on a guess
+            # and a wrong guess costs a cancelled ask.
+            if is_confident_partial(event.text):
+                self.speculated = True
+                await self._take_turn(event.text, event.metadata)
         await self._transcript("user", event.text, event.final, int(self.session_id))
 
-    async def _take_turn(self, text: str) -> None:
+    async def _take_turn(self, text: str, metadata: dict | None = None) -> None:
         self.turn_id += 1
-        await self.agent.queue_llm_input(text)
+        # A name the recogniser was unsure of goes to the model as a fact, not
+        # as an instruction: it already has a `confirm` tool and knows when to
+        # reach for it. Four hundred milliseconds of confirmation beats an
+        # answer that is confidently about the wrong team (docs/00-plan.md D12).
+        hint = ""
+        if self.config.confirm_entities:
+            terms = uncertain_terms(text, (metadata or {}).get("word_confidence"))
+            hint = confirmation_hint(terms)
+            if terms:
+                self.ten_env.log_info(f"das_host: unsure of {terms}")
+        await self.agent.queue_llm_input(f"{text} {hint}".strip() if hint else text)
 
     @agent_event_handler(LLMResponseEvent)
     async def _on_llm_response(self, event: LLMResponseEvent) -> None:

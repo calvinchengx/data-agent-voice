@@ -28,17 +28,29 @@ export default defineConfig({
       },
       sidebar: [
         {
-          label: 'Start here',
-          items: [{ slug: 'index' }, { slug: '00-plan' }],
+          label: 'Getting started',
+          items: [{ slug: 'index' }, { slug: '01-quickstart' }, { slug: '02-architecture' }],
         },
         {
-          label: 'What was read',
-          items: [{ slug: '05-ten' }, { slug: '06-ci' }],
+          label: 'Using it',
+          items: [{ slug: '04-tiers' }, { slug: '03-latency' }],
         },
         {
-          // Living ledgers rather than chapters: a reader looks things up here.
+          label: 'Proving it',
+          items: [{ slug: '06-witnesses' }, { slug: '07-ci' }],
+        },
+        {
+          // The plan is the long-form argument and the reading of the
+          // framework is its evidence; parity and upstream-issues are living
+          // ledgers rather than chapters, so they sit at the end where a
+          // reader looks things up rather than reads through.
           label: 'Reference',
-          items: [{ slug: 'parity' }, { slug: 'upstream-issues' }],
+          items: [
+            { slug: '00-plan' },
+            { slug: '05-ten' },
+            { slug: 'parity' },
+            { slug: 'upstream-issues' },
+          ],
         },
       ],
     }),

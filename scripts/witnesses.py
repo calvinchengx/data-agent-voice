@@ -22,7 +22,6 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "docs" / "witnesses.json"
-LANDING = ROOT / "site" / "index.html"
 README = ROOT / "README.md"
 COVERAGE = ROOT / "docs" / "coverage.json"
 TOLERANCE = 0.5
@@ -97,12 +96,6 @@ def main() -> int:
     # rather than by hand means the number has one author: editing it by hand
     # left the page a run behind every time a test was added, which the guard
     # then reported as drift.
-    _restate(
-        LANDING,
-        r"<b>\d+</b>(<span>(?:end-to-end witnesses|checks on the design))",
-        rf"<b>{total}</b>\1",
-        total,
-    )
     _restate(
         README, r"\d+ checks, run by `make test`", f"{total} checks, run by `make test`", total
     )

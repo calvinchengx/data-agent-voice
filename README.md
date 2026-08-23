@@ -48,13 +48,21 @@ The full argument, with the numbers behind it, is in
 
 | Path | Purpose |
 |---|---|
-| [`docs/00-plan.md`](docs/00-plan.md) | Architecture, decisions, phases, the latency budget, risks |
-| [`docs/05-ten.md`](docs/05-ten.md) | TEN at the pinned tag, read from the source — including what it does *not* do |
+| [`docs/01-quickstart.md`](docs/01-quickstart.md) | Run it, and what you will and will not get |
+| [`docs/02-architecture.md`](docs/02-architecture.md) | The two loops, the nodes, and where authority is not |
+| [`docs/04-tiers.md`](docs/04-tiers.md) | The three tiers, and what the host may never say |
+| [`docs/03-latency.md`](docs/03-latency.md) | The budget, the switches, and where the seconds actually are |
+| [`docs/06-witnesses.md`](docs/06-witnesses.md) | What is checked, and what that is worth |
+| [`docs/07-ci.md`](docs/07-ci.md) | What CI runs and when — a documentation change skips the image builds |
+| [`docs/00-plan.md`](docs/00-plan.md) | The long-form argument: decisions, phases, risks |
+| [`docs/05-ten.md`](docs/05-ten.md) | TEN at the pinned tag, read from source — including what it does not do |
 | [`docs/parity.md`](docs/parity.md) | What is witnessed, and what is not |
-| [`docs/06-ci.md`](docs/06-ci.md) | What CI runs and when — a documentation change skips the nine minutes of image builds |
-| `tenapp/` | The TEN app: the `analyst_line` graph, and one descriptor per backend |
-| `docker/ten/` | The image, multi-arch — arm64 from the release assets, since the registry has none |
-| `tests/` | The configuration held to itself: 159 checks, run by `make test` |
+| [`docs/upstream-issues.md`](docs/upstream-issues.md) | Seven defects found by running it |
+| `tenapp/` | The TEN app: the graphs, and one descriptor per backend |
+| `extensions/` | The four this repository writes |
+| `docker/ten/` | The image, multi-arch — arm64 from the release assets |
+| `panel/` | The instrument panel: where the time went |
+| `tests/` | The configuration held to itself: 159 checks |
 
 ## Quick start
 

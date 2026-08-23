@@ -105,28 +105,37 @@ function convert(relative: string): string {
 // things to keep true.
 function writeIndex(): void {
   const body =
-    `Talk to your governed data. Ask in English, out loud, and hear the answer with the\n` +
-    `definition it applied and the caveat it raised — because you cannot skim audio, and a\n` +
-    `number without its meaning is how the wrong team wins.\n\n` +
+    `Talk to your governed data. Ask out loud, and hear the answer with the definition it\n` +
+    `applied and the caveat it raised — because you cannot skim audio, and a number without\n` +
+    `its meaning is how the wrong team wins.\n\n` +
     `A voice front end over [data-agent-service](https://github.com/calvinchengx/data-agent-service),\n` +
     `built on the [TEN framework](https://github.com/TEN-framework/ten-framework). You sign in\n` +
     `once, and every question runs as you, all the way to the source.\n\n` +
-    `:::caution[No audio has ever been through this]\n` +
-    `The architecture is decided, the framework is pinned and read, the image and the graph\n` +
-    `exist, and the configuration is held to itself by a test suite. Four extensions the graph\n` +
-    `names are not written yet. [Parity](parity.md) says which rows are green and which are\n` +
-    `red, and none of them claims a working line.\n` +
+    `:::caution[No one has heard an answer from this]\n` +
+    `The architecture is decided, the framework is pinned and read from its source, both\n` +
+    `image legs build, all seven nodes load, and speech has been recognised end to end. What\n` +
+    `has never happened is a reply coming back as sound. [Parity](parity.md) says which rows\n` +
+    `are green and which are red, and none of them claims a working line.\n` +
     `:::\n\n` +
-    `## Start here\n\n` +
-    `- [The plan](00-plan.md) — the architecture, the latency budget, the phases and the risks\n` +
-    `- [TEN at 0.11.71](05-ten.md) — what the framework actually does, read from its source,\n` +
-    `  including what it does not do\n` +
-    `- [Parity](parity.md) — what is witnessed, and what is not\n\n` +
+    `## Getting started\n\n` +
+    `- [Quickstart](01-quickstart.md) — run it, and what you will and will not get\n` +
+    `- [Architecture](02-architecture.md) — the two loops, the nodes, and where authority is not\n\n` +
+    `## Using it\n\n` +
+    `- [Tiers](04-tiers.md) — the three tiers, and what the host may never say\n` +
+    `- [Latency](03-latency.md) — the budget, the switches, and where the seconds actually are\n\n` +
+    `## Proving it\n\n` +
+    `- [Witnesses](06-witnesses.md) — what is checked, and what that is worth\n` +
+    `- [CI](07-ci.md) — what runs when; a documentation change skips the image builds\n\n` +
+    `## Reference\n\n` +
+    `- [The plan](00-plan.md) — the long-form argument: decisions, phases, risks\n` +
+    `- [TEN at 0.11.71](05-ten.md) — read from source, including what it does not do\n` +
+    `- [Parity](parity.md) — what is witnessed, and what is not\n` +
+    `- [Upstream issues](upstream-issues.md) — seven defects, found by running it\n\n` +
     `## The gap this is built around\n\n` +
     `A question to the service upstream takes **26 seconds at the median**. A conversation\n` +
     `reads as broken after about **one second** of silence. No faster model closes a gap of\n` +
-    `thirty times, so this does not try to: the conversation stops waiting for the agent, and\n` +
-    `the agent runs where nobody is waiting.\n`;
+    `thirty times, so this does not try to: the conversation stops waiting for the agent,\n` +
+    `and the agent runs where nobody is waiting.\n`;
   const frontmatter =
     `---\ntitle: Overview\ndescription: The Analyst Line — talk to your governed data, ` +
     `over a service that takes twenty-six seconds and a conversation that cannot wait.` +

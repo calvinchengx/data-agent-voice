@@ -38,18 +38,23 @@ holding with a person talking to the line.
 
 | Capability | Witnessed locally | Check | Witnessed running |
 |---|---|---|---|
-| The image builds on amd64 | 🟢 | `docker buildx build --platform linux/amd64` — 904 MB | not yet |
-| The image builds on arm64 from the release assets, and `faster-whisper` installs there | 🟢 — `ctranslate2` 4.8.1 has an aarch64 wheel | `docker buildx build --platform linux/arm64` — 986 MB | not yet |
-| The server starts and registers the graph | 🟢 on arm64 | `/health` answers, `/graphs` lists `analyst_line` | not yet |
+| The image builds on amd64 | 🟢 in CI, every push | the `image (amd64)` job — 904 MB, 326 s | not yet |
+| The image builds on arm64 from the release assets, and `faster-whisper` installs there | 🟢 in CI, on a native arm runner — `ctranslate2` 4.8.1 has an aarch64 wheel | the `image (arm64)` job — 986 MB, 213 s | not yet |
+| The server starts and registers the graph, on both architectures | 🟢 in CI | the smoke step: `/health` answers and `/graphs` lists `analyst_line` | not yet |
 | A backend descriptor loads, interpolates its settings, and every way it can be malformed is refused at start-up rather than at run time | 🟢 | `make test` — 15 checks over `das_tools/descriptor.py` | not yet |
 | A pre-rendered phrase and a synthesized one are one code path to everything downstream | 🟢 by construction | `local_tts` serves both through `get()`; no test reaches it without the runtime | not yet |
 | Everything the caller hears leaves through one path, so there is never a second speaker with no arbiter | 🟢 structurally | `make test` — one `tts_text_input` send in `das_host` | not yet |
 | A refusal, an abstention and an error each have their own fixed phrase, and the refusal does not sound like missing data | 🟢 | `make test` — 8 checks over the host's policy | not yet |
-| A person speaks and hears an answer | 🔴 **not run** — all four extensions exist and the image runs; no audio has been through it | `make up && make call` | not yet |
-| First audio under 900 ms at p95 | 🔴 **not run** | `make test` (phase 5 of the plan) | not yet |
+| Speech reaches the graph, is recognised, and a final transcript reaches the host | 🟢 **run** — 2.7 s of synthesized speech in, `is_final` transcripts out, on arm64 | `make up`, then feed PCM to the WebSocket | not yet |
+| Every extension in the graph loads and the session stays up | 🟢 **run** — all seven nodes, `/list` shows the session alive | `make up` and `POST /start` | not yet |
+| The host takes the turn and calls the model | 🟠 **partly** — the call is made and fails against the `llm-stub`, which answers plain JSON where the SDK streams. The stub cannot stand in for a model here | needs `ANTHROPIC_API_KEY` | not yet |
+| A person speaks and **hears an answer** | 🔴 **not run** — everything up to the model is proven; TTS has never been reached | `make up && make call` with a key | not yet |
+| The panel's arithmetic is right: p95 by nearest rank, a span needs both marks, the first mark wins, and an unmeasured phase reads as nothing rather than zero | 🟢 | `make test` — 11 checks run through node | not yet |
+| The panel stores nothing — no transcript, no question, no audio | 🟢 | `make test` — the page uses no storage API | not yet |
+| A mis-transcribed entity produces a confirmation, not a dispatch | 🟢 the decision; 🔴 the call | `make test` — 15 checks over the uncertainty rules | not yet |
+| First audio under 900 ms at p95 | 🔴 **not run** — the panel can measure it; nothing has been measured | `make up`, then a call | not yet |
 | A definitional question is answered without dispatching | 🔴 **not run** | the tiers witness | not yet |
 | A refusal is spoken from a fixed phrase and never paraphrased | 🔴 **not run** | the refusal witness | not yet |
-| A mis-transcribed entity produces a confirmation, not an answer | 🔴 **not run** | the confirm witness | not yet |
 | Semantic turn detection beats fixed silence | 🔴 **not run** — needs a GPU this machine does not have | switch #1, off vs on | not yet |
 
 ## Upstream, for reference

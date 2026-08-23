@@ -56,21 +56,36 @@ jobs:
   image:
     name: The image builds, on both architectures
     runs-on: ubuntu-latest
-    # Skipped, visibly, until the four extensions the graph names exist: the
-    # build cannot succeed without them and a job that is red on every push
-    # teaches people to stop reading CI. It starts running by itself the
-    # moment the first extension lands, which is when its answer becomes
-    # worth having. docs/parity.md records the build as not run either way.
-    if: hashFiles('extensions/*/manifest.json') != ''
     # The arm64 leg is assembled from the release assets rather than the
     # registry, which serves linux/x64 only (docs/05-ten.md §8). It is slow
     # and it is the one that will break first, so it runs here rather than
     # being discovered on someone's laptop.
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      # Skipped, visibly, until the four extensions the graph names exist: the
+      # build cannot succeed without them, and a job that is red on every push
+      # teaches people to stop reading CI. It starts building by itself the
+      # moment the first extension lands, which is when its answer becomes
+      # worth having. docs/parity.md records the build as not run either way.
+      #
+      # A step rather than a job-level `if`, because `hashFiles` reads the
+      # workspace and at job level is evaluated before checkout -- so it saw
+      # an empty tree and the whole workflow failed to parse the condition.
+      - id: ready
+        shell: bash
+        run: |
+          if compgen -G "extensions/*/manifest.json" > /dev/null; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Image not built::extensions/ holds no extension yet; the graph names four that are not written. See docs/parity.md."
+          fi
+      - if: steps.ready.outputs.build == 'true'
+        uses: docker/setup-qemu-action@v3
+      - if: steps.ready.outputs.build == 'true'
+        uses: docker/setup-buildx-action@v3
       - name: Build
+        if: steps.ready.outputs.build == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .

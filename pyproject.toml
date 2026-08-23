@@ -14,6 +14,12 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Files taken unchanged from the pinned TEN tag. Formatting them would make
+# them differ from upstream for no reason a reader could act on, and
+# `make vendor-check` would then report a difference with no PR behind it --
+# which is exactly the signal that rule exists to keep meaningful. A patch to
+# a vendored file is deliberate, reviewed, and carries a VENDORED entry.
+extend-exclude = ["tenapp/scripts/", "extensions/vendor/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]

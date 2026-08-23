@@ -1,0 +1,9 @@
+Taken unchanged from TEN-framework/ten-framework at tag 0.11.71.
+
+  start.py   the app entrypoint: loads .env, sets PYTHONPATH, execs the binary
+  ../main.go the same, for the Go side -- nothing here is written in Go
+
+No patch. If one ever becomes necessary it is an upstream PR first, and this
+file records the PR alongside the tag (docs/05-ten.md §7). These files are
+excluded from ruff in pyproject.toml for the same reason: formatting them
+would create a difference from the tag that no reader could act on.

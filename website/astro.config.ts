@@ -29,7 +29,7 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Start here',
-          items: [{ slug: '00-plan' }],
+          items: [{ slug: 'index' }, { slug: '00-plan' }],
         },
         {
           label: 'What was read',

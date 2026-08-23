@@ -105,25 +105,32 @@ function convert(relative: string): string {
 // things to keep true.
 function writeIndex(): void {
   const body =
-    `Natural-language questions over governed data — grounded in the glossary, metrics and\n` +
-    `schema held in OpenMetadata, fronted by Azure API Management, and answered under the\n` +
-    `asking user's own Entra identity.\n\n` +
-    `Everything here runs locally against the [Azure emulator family](https://github.com/calvinchengx/emulators),\n` +
-    `and the same code runs against real Azure — switching is configuration, not a code path.\n\n` +
+    `Talk to your governed data. Ask in English, out loud, and hear the answer with the\n` +
+    `definition it applied and the caveat it raised — because you cannot skim audio, and a\n` +
+    `number without its meaning is how the wrong team wins.\n\n` +
+    `A voice front end over [data-agent-service](https://github.com/calvinchengx/data-agent-service),\n` +
+    `built on the [TEN framework](https://github.com/TEN-framework/ten-framework). You sign in\n` +
+    `once, and every question runs as you, all the way to the source.\n\n` +
+    `:::caution[No audio has ever been through this]\n` +
+    `The architecture is decided, the framework is pinned and read, the image and the graph\n` +
+    `exist, and the configuration is held to itself by a test suite. Four extensions the graph\n` +
+    `names are not written yet. [Parity](parity.md) says which rows are green and which are\n` +
+    `red, and none of them claims a working line.\n` +
+    `:::\n\n` +
     `## Start here\n\n` +
-    `- [Quick start](01-quickstart.md) — the whole stack from nothing\n` +
-    `- [Architecture](03-architecture.md) — what each component is for\n` +
-    `- [MCP clients](09-mcp-clients.md) — connect Claude, Cursor or VS Code with no custom code\n` +
-    `- [Authorization](05-authorization.md) — how one user sees different rows than another\n` +
-    `- [Classification](19-classification.md) — how a sensitivity label in OpenMetadata becomes a withheld column\n` +
-    `- [Running against real Azure](10-production.md) — what changes, and what does not\n\n` +
-    `## How claims are checked\n\n` +
-    `- [Evaluation](07-evaluation.md) — does the catalog change the answer?\n` +
-    `- [Load testing](08-load-testing.md) — and what the gateway costs\n` +
-    `- [Parity](parity.md) — what is witnessed, and what is not yet\n`;
+    `- [The plan](00-plan.md) — the architecture, the latency budget, the phases and the risks\n` +
+    `- [TEN at 0.11.71](05-ten.md) — what the framework actually does, read from its source,\n` +
+    `  including what it does not do\n` +
+    `- [Parity](parity.md) — what is witnessed, and what is not\n\n` +
+    `## The gap this is built around\n\n` +
+    `A question to the service upstream takes **26 seconds at the median**. A conversation\n` +
+    `reads as broken after about **one second** of silence. No faster model closes a gap of\n` +
+    `thirty times, so this does not try to: the conversation stops waiting for the agent, and\n` +
+    `the agent runs where nobody is waiting.\n`;
   const frontmatter =
-    `---\ntitle: Overview\ndescription: A governed data agent — natural-language questions over Fabric, ` +
-    `PostgreSQL and more, grounded in OpenMetadata and answered as the asking user.\neditUrl: false\n---\n\n`;
+    `---\ntitle: Overview\ndescription: The Analyst Line — talk to your governed data, ` +
+    `over a service that takes twenty-six seconds and a conversation that cannot wait.` +
+    `\neditUrl: false\n---\n\n`;
   writeFileSync(join(OUT, 'index.md'), frontmatter + rewriteLinks(body, 'index'));
 }
 

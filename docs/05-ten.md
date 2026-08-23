@@ -194,6 +194,44 @@ bump is a diff against the tag, reviewable. It also means the discipline rule
 "dependencies as-is" needs one stated exception: **vendored extensions may
 carry patches, each one an upstream PR first**, because (3) and (6) require it.
 
+### 8. arm64 is buildable, but not from the image or the registry
+
+Two published paths are amd64-only, and one is not:
+
+| Source | amd64 | arm64 |
+|---|---|---|
+| `ghcr.io/ten-framework/ten_agent_build:0.7.14` | yes | **no** — a single-arch image, no manifest list |
+| the `tman` package registry | yes | **no** — `manifest-lock.json` at the tag records `supports: [linux/x64]` for `ten_runtime`, `ten_runtime_python` and `ten_runtime_go` |
+| the **GitHub release assets at the same tag** | yes | **yes** — `ten_packages-linux-arm64-gcc-release.zip` (103 MB) and `tman-linux-release-arm64.zip` |
+
+The arm64 bundle carries `ten_runtime`, `ten_runtime_python`
+(`libten_runtime_python.so`), `ten_runtime_go` and `ten_runtime_nodejs`. So
+arm64 is supported by the project; it is only unreachable through the two
+distribution channels a Dockerfile would normally use. `tman install` on an
+aarch64 host resolves nothing and fails, which reads as "arm64 unsupported"
+and is not.
+
+**Consequence:** `docker/ten/Dockerfile` has two builder stages selected by
+`FROM builder-${TARGETARCH}` — amd64 takes TEN's published image and runs
+`tman install`; arm64 takes `ubuntu:22.04`, installs the same toolchain
+versions the published image uses, and unpacks the release assets into
+`ten_packages/` before letting `tman` resolve only the pure-Python packages
+(`ten_ai_base`, whose `supports` list at the tag is empty, so it is
+arch-neutral). Both legs converge before the app is assembled, and
+`docker buildx build --platform linux/amd64,linux/arm64` produces one manifest
+list.
+
+The amd64 leg is the one upstream tests. **When the two disagree, amd64 is
+right and the difference is an upstream issue**, not something to work around
+here.
+
+**Still unproven on arm64:** `faster-whisper` depends on `ctranslate2`, whose
+aarch64 Linux wheel availability this reading did not establish. If there is
+no wheel, in-process ASR on arm64 either builds from source at image build
+time or moves to a sidecar. A first `buildx` run on the arm64 leg answers it,
+and until one has been done, **multi-arch is a claim this repo has not
+witnessed** — `parity.md` says so.
+
 ## What did not change
 
 * **D10 holds.** Thin extensions speaking HTTP/SSE to the ask service is

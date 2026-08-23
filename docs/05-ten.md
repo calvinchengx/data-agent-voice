@@ -225,12 +225,29 @@ The amd64 leg is the one upstream tests. **When the two disagree, amd64 is
 right and the difference is an upstream issue**, not something to work around
 here.
 
-**Still unproven on arm64:** `faster-whisper` depends on `ctranslate2`, whose
-aarch64 Linux wheel availability this reading did not establish. If there is
-no wheel, in-process ASR on arm64 either builds from source at image build
-time or moves to a sidecar. A first `buildx` run on the arm64 leg answers it,
-and until one has been done, **multi-arch is a claim this repo has not
-witnessed** — `parity.md` says so.
+**Both legs now build, and three things the reading could not settle were
+settled by building them:**
+
+* `ctranslate2` **4.8.1 has an aarch64 wheel**, so `faster-whisper` installs
+  and in-process ASR needs no sidecar. This was the open risk; it is closed by
+  evidence rather than assumption.
+* The arm64 `tman` is linked against **glibc 2.38/2.39**, and TEN's own build
+  image is 22.04 (glibc 2.35), so it will not start there. The arm64 builder
+  and the runtime image are `ubuntu:24.04`; the amd64 leg keeps TEN's image,
+  so the path upstream tests is untouched. `upstream-issues.md` 3.
+* `libasound2` is `libasound2t64` on 24.04, and the API server exits unless
+  `AGORA_APP_ID` is **exactly 32 characters** even for a graph with no RTC
+  node at all. `upstream-issues.md` 1.
+
+The server starts on arm64 and registers the graph:
+
+```
+health: {"code":"0","msg":"ok"}
+graphs: [{"graph_id":"analyst_line","auto_start":false}]
+```
+
+What is still not witnessed is a **call** — audio in, audio out, with a person
+at a microphone. `parity.md` keeps that row red.
 
 ## What did not change
 

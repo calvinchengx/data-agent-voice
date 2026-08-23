@@ -40,14 +40,21 @@ RUN git clone --depth 1 --branch ${TEN_VERSION} \
 FROM ghcr.io/ten-framework/ten_agent_build:${TEN_BUILD_IMAGE_VERSION} AS builder-amd64
 ARG TEN_VERSION
 ENV TEN_ARCH_SOURCE=registry
+# TEN's build image is 22.04, whose pip predates PEP 668 and rejects the flag
+# the 24.04 leg needs. One variable rather than two install steps.
+ENV PIP_FLAGS=""
 
 # ------------------------------------------------------- builder (arm64) --
 # The same toolchain the published image has, assembled for aarch64, plus the
 # runtime unpacked from the release. Versions match
 # tools/docker_for_building/ubuntu/22.04/Dockerfile at the tag.
-FROM ubuntu:22.04 AS builder-arm64
+# 24.04, not 22.04: the arm64 `tman` in the release is linked against glibc
+# 2.38/2.39 and 22.04 ships 2.35, so it will not start at all. The amd64 leg
+# keeps TEN's own 22.04-based image, which is what upstream tests.
+FROM ubuntu:24.04 AS builder-arm64
 ARG TEN_VERSION
 ENV TEN_ARCH_SOURCE=release
+ENV PIP_FLAGS="--break-system-packages"
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential clang cmake curl unzip zip git jq ca-certificates \
@@ -102,8 +109,19 @@ RUN set -eux; \
     test -d ten_packages/system/ten_runtime_python
 
 # Python dependencies for every extension the graph loads.
-RUN bash /app/agents/scripts/install_python_deps.sh 2>/dev/null \
- || find ten_packages/extension -name requirements.txt -exec pip3 install --no-cache-dir -r {} \;
+#
+# `find -L`, and the count is asserted. `tman install` links each extension
+# into ten_packages/ rather than copying it, so a plain `find` matches nothing
+# -- which it did, silently, behind a `||` fallback: the image built, and
+# `ctranslate2` was simply absent, so the ASR node would have failed to load
+# at the first call rather than at build time. An install step that can find
+# nothing and still succeed is not an install step.
+RUN set -eux; \
+    reqs=$(find -L ten_packages/extension -maxdepth 2 -name requirements.txt); \
+    test -n "$reqs"; \
+    echo "$reqs" | wc -l; \
+    for r in $reqs; do pip3 install --no-cache-dir $PIP_FLAGS -r "$r"; done; \
+    python3 -c "import ctranslate2, faster_whisper, httpx, anthropic"
 
 # The Go API server: /start spawns one worker per session.
 WORKDIR /app/server
@@ -114,7 +132,10 @@ WORKDIR /app/agents/analyst_line/tenapp
 RUN tman package --output-path /tmp/app.tar 2>/dev/null || true
 
 # --------------------------------------------------------------- runtime --
-FROM ubuntu:22.04
+# Also 24.04, for the same reason on the arm64 leg -- the runtime libraries in
+# the release need it. amd64 binaries built on 22.04 run here unchanged, glibc
+# being backward compatible; the reverse is what fails.
+FROM ubuntu:24.04
 ARG TEN_VERSION
 LABEL org.opencontainers.image.title="data-agent-voice / analyst-line" \
       org.opencontainers.image.description="TEN graph for the Analyst Line: WebSocket in, local ASR/TTS, Claude host, the ask service behind it" \
@@ -123,8 +144,11 @@ LABEL org.opencontainers.image.title="data-agent-voice / analyst-line" \
       com.calvinchengx.ten.version="${TEN_VERSION}"
 
 ENV DEBIAN_FRONTEND=noninteractive
+# libasound2 became libasound2t64 in 24.04 (the time_t transition). Naming the
+# old one here fails the build with "no installation candidate", which reads as
+# a missing package rather than a renamed one.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      libasound2 libgstreamer1.0-dev libunwind-dev libc++1 libssl-dev \
+      libasound2t64 libgstreamer1.0-dev libunwind-dev libc++1 libssl-dev \
       python3 python3-pip python3-venv ca-certificates curl jq \
  && rm -rf /var/lib/apt/lists/*
 
@@ -137,9 +161,24 @@ RUN ldconfig
 
 # faster-whisper's weights are pulled on first use into this cache, which
 # compose keeps in a volume: a cold start downloads, a restart does not.
+# LOG_PATH is required, not optional: the server exits at start-up with
+# "mkdir : no such file or directory" when it is unset, which names the
+# symptom and not the cause. Set here so the image runs on its own rather
+# than only under this repository's compose file.
+# AGORA_APP_ID is validated at start-up whether or not a graph contains an
+# `agora_rtc` node, and this one does not -- the transport is
+# `websocket_server` (docs/05-ten.md §1). The check is `len() != 32` and
+# nothing else, so the placeholder is exactly 32 characters and says what it
+# is. Nothing reads it. Written up in docs/upstream-issues.md.
+RUN mkdir -p /app/log
 ENV HF_HOME=/root/.cache/huggingface \
     PYTHONUNBUFFERED=1 \
-    SERVER_PORT=8080
+    LOG_PATH=/app/log \
+    LOG_STDOUT=true \
+    WORKERS_MAX=10 \
+    WORKER_QUIT_TIMEOUT_SECONDS=120 \
+    SERVER_PORT=8080 \
+    AGORA_APP_ID=noagorartcnodeinthisgraph0000000
 
 EXPOSE 8080 8765
 HEALTHCHECK --interval=10s --timeout=5s --retries=18 --start-period=30s \

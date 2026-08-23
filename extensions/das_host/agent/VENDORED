@@ -1,0 +1,12 @@
+Taken unchanged from TEN-framework/ten-framework at tag 0.11.71:
+
+  ai_agents/agents/examples/websocket-example/tenapp/
+    ten_packages/extension/main_python/{agent/,helper.py}
+
+Generic plumbing, not policy: an event dispatcher, a queue in front of the LLM
+node, sentence splitting, and the send helpers. None of it knows anything about
+tiers, backends or this project, so it is taken rather than rewritten and it is
+excluded from ruff for the reason docs/05-ten.md §7 gives.
+
+The fork is extension.py, which replaces main_python's own. No patch here. If
+one becomes necessary it is an upstream PR first, and this file records it.

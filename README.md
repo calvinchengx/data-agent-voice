@@ -53,7 +53,7 @@ The full argument, with the numbers behind it, is in
 | [`docs/parity.md`](docs/parity.md) | What is witnessed, and what is not |
 | `tenapp/` | The TEN app: the `analyst_line` graph, and one descriptor per backend |
 | `docker/ten/` | The image, multi-arch — arm64 from the release assets, since the registry has none |
-| `tests/` | The configuration held to itself: 58 checks, run by `make test` |
+| `tests/` | The configuration held to itself: 72 checks, run by `make test` |
 
 ## Quick start
 

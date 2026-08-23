@@ -10,7 +10,10 @@
               "type": "extension",
               "name": "transport",
               "addon": "websocket_server",
-              "property": { "host": "0.0.0.0", "port": 8765 }
+              "property": {
+                "host": "0.0.0.0",
+                "port": 8765
+              }
             },
             {
               "type": "extension",
@@ -106,59 +109,232 @@
             {
               "extension": "transport",
               "audio_frame": [
-                { "name": "pcm_frame", "dest": [{ "extension": "vad" }, { "extension": "stt" }] }
+                {
+                  "name": "pcm_frame",
+                  "dest": [
+                    {
+                      "extension": "vad"
+                    },
+                    {
+                      "extension": "stt"
+                    }
+                  ]
+                }
               ]
             },
             {
               "extension": "vad",
-              "data": [{ "name": "vad_result", "dest": [{ "extension": "host" }] }]
+              "data": [
+                {
+                  "name": "vad_result",
+                  "dest": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "extension": "stt",
               "data": [
-                { "name": "asr_result", "dest": [{ "extension": "host" }, { "extension": "turn_detection" }] }
+                {
+                  "name": "asr_result",
+                  "dest": [
+                    {
+                      "extension": "host"
+                    },
+                    {
+                      "extension": "turn_detection"
+                    }
+                  ]
+                }
               ]
             },
             {
               "extension": "turn_detection",
-              "data": [{ "name": "text_data", "dest": [{ "extension": "host" }] }],
-              "cmd": [{ "names": ["flush"], "dest": [{ "extension": "host" }] }]
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                }
+              ],
+              "cmd": [
+                {
+                  "names": [
+                    "flush"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "extension": "host",
               "cmd": [
-                { "names": ["tool_register"], "dest": [{ "extension": "llm" }] },
-                { "names": ["flush"], "dest": [{ "extension": "llm" }, { "extension": "tts" }, { "extension": "transport" }] }
+                {
+                  "names": [
+                    "tool_register"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "llm"
+                    }
+                  ]
+                },
+                {
+                  "names": [
+                    "flush"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "llm"
+                    },
+                    {
+                      "extension": "tts"
+                    },
+                    {
+                      "extension": "transport"
+                    }
+                  ]
+                },
+                {
+                  "names": [
+                    "ask_cancel"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "bridge"
+                    }
+                  ]
+                }
               ],
               "data": [
-                { "name": "text_data", "dest": [{ "extension": "llm" }] },
-                { "name": "tts_text_input", "dest": [{ "extension": "tts" }] }
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "llm"
+                    }
+                  ]
+                },
+                {
+                  "name": "tts_text_input",
+                  "dest": [
+                    {
+                      "extension": "tts"
+                    }
+                  ]
+                }
               ]
             },
             {
               "extension": "llm",
-              "data": [{ "name": "text_data", "dest": [{ "extension": "host" }] }],
-              "cmd": [{ "names": ["tool_call"], "dest": [{ "extension": "tools" }] }]
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                }
+              ],
+              "cmd": [
+                {
+                  "names": [
+                    "tool_call"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "tools"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "extension": "tools",
               "cmd": [
-                { "names": ["tool_register"], "dest": [{ "extension": "host" }] },
-                { "names": ["ask_dispatched"], "dest": [{ "extension": "bridge" }] }
+                {
+                  "names": [
+                    "tool_register"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                },
+                {
+                  "names": [
+                    "ask_dispatched"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "host"
+                    },
+                    {
+                      "extension": "bridge"
+                    }
+                  ]
+                }
               ]
             },
             {
               "extension": "bridge",
               "data": [
-                { "name": "tts_text_input", "dest": [{ "extension": "tts" }] },
-                { "name": "text_data", "dest": [{ "extension": "transport" }] }
+                {
+                  "name": "agent_turn",
+                  "dest": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                }
               ],
-              "cmd": [{ "names": ["ask_cancel"], "source": [{ "extension": "host" }] }]
+              "cmd": [
+                {
+                  "names": [
+                    "ask_cancel"
+                  ],
+                  "source": [
+                    {
+                      "extension": "host"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "extension": "tts",
-              "audio_frame": [{ "name": "pcm_frame", "dest": [{ "extension": "transport" }] }],
-              "data": [{ "name": "text_data", "dest": [{ "extension": "transport" }] }]
+              "audio_frame": [
+                {
+                  "name": "pcm_frame",
+                  "dest": [
+                    {
+                      "extension": "transport"
+                    }
+                  ]
+                }
+              ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "transport"
+                    }
+                  ]
+                }
+              ]
             }
           ]
         }

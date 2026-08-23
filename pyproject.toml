@@ -19,7 +19,7 @@ target-version = "py312"
 # `make vendor-check` would then report a difference with no PR behind it --
 # which is exactly the signal that rule exists to keep meaningful. A patch to
 # a vendored file is deliberate, reviewed, and carries a VENDORED entry.
-extend-exclude = ["tenapp/scripts/", "extensions/vendor/"]
+extend-exclude = ["tenapp/scripts/", "extensions/vendor/", "extensions/das_host/agent/", "extensions/das_host/helper.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
@@ -46,6 +46,8 @@ omit = [
     # deliberately free of that dependency so the rule §16 rests on IS testable.
     "extensions/*/addon.py",
     "extensions/*/extension.py",
+    "extensions/das_host/agent/*",
+    "extensions/das_host/helper.py",
     "extensions/local_tts/config.py",
     "extensions/local_tts/client.py",
 ]

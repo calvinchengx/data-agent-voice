@@ -1,0 +1,113 @@
+{
+  "type": "extension",
+  "name": "das_host",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "0.11"
+    },
+    {
+      "type": "system",
+      "name": "ten_ai_base",
+      "version": "0.7"
+    }
+  ],
+  "package": {
+    "include": [
+      "manifest.json",
+      "property.json",
+      "**.py",
+      "README.md",
+      "requirements.txt",
+      "agent/VENDORED"
+    ]
+  },
+  "api": {
+    "property": {
+      "properties": {
+        "greeting": {
+          "type": "string"
+        },
+        "eou_mode": {
+          "type": "string"
+        },
+        "tts_chunk": {
+          "type": "string"
+        },
+        "prerendered_ack": {
+          "type": "string"
+        },
+        "speculative_dispatch": {
+          "type": "string"
+        },
+        "confirm_entities": {
+          "type": "string"
+        },
+        "ack_phrase": {
+          "type": "string"
+        },
+        "refusal_phrase": {
+          "type": "string"
+        },
+        "abstention_phrase": {
+          "type": "string"
+        },
+        "error_phrase": {
+          "type": "string"
+        }
+      }
+    },
+    "cmd_in": [
+      {
+        "name": "tool_register"
+      },
+      {
+        "name": "flush"
+      },
+      {
+        "name": "ask_dispatched"
+      },
+      {
+        "name": "on_user_joined"
+      },
+      {
+        "name": "on_user_left"
+      }
+    ],
+    "cmd_out": [
+      {
+        "name": "flush"
+      },
+      {
+        "name": "ask_cancel"
+      },
+      {
+        "name": "tool_register"
+      }
+    ],
+    "data_in": [
+      {
+        "name": "asr_result"
+      },
+      {
+        "name": "text_data"
+      },
+      {
+        "name": "agent_turn"
+      }
+    ],
+    "data_out": [
+      {
+        "name": "text_data"
+      },
+      {
+        "name": "tts_text_input"
+      },
+      {
+        "name": "tts_flush"
+      }
+    ]
+  }
+}

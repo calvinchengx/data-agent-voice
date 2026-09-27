@@ -172,6 +172,33 @@ cache planned for it) and, for all but Ultravox and Hume, the verbatim
 refusal. Neither is worth an end-to-end number that still does not reach the
 target.
 
+## What it costs
+
+Per call-hour: a 60-minute call with STT billed on all 60 minutes streamed,
+15 minutes of agent speech (13,500 characters), and the host at about $0.04
+(Claude Haiku 4.5, 40 turns, cached prefix). List prices fetched 2026-09-27.
+
+| Stack | STT | TTS | Per call-hour |
+|---|---|---|---|
+| Soniox STT + ElevenLabs Flash (recommended) | Soniox stt-rt-v5, Japan, $0.12/h | ElevenLabs Flash v2.5, Singapore routing, $50/1M chars | **$0.84** |
+| Soniox STT + Inworld TTS-2 Flash | $0.12/h | $15/1M chars, Asian serving undocumented | $0.36 |
+| Soniox STT + Soniox TTS | $0.12/h | $13/1M chars, Japan, no TEN extension | $0.34 |
+| Deepgram Flux + Aura-2 | $0.39/h | $30/1M chars, US/EU/AU only | $0.84 |
+| Self-hosted in Singapore | Nemotron/Parakeet | Kokoro | ~$0.10 per stream-hour at utilisation |
+
+Speech-to-speech for comparison: Gemini Live about $0.42-0.57, OpenAI
+gpt-realtime about $2.05 (mini $0.76), Ultravox $3.00, ElevenLabs Agents
+$4.80 plus the LLM.
+
+Self-hosting in Singapore: **AWS ap-southeast-1 has no L4, L40S, A10G or
+H100 instances** (only T4, Inferentia and 8xA100). GCP g2-standard-4 (one L4)
+in asia-southeast1 is $0.87/h on demand, $0.55 on a one-year commitment; one
+L4 serves about 40 Kokoro streams, so it pays off above roughly three to four
+concurrent calls around the clock.
+
+The full table, with latency bars, quality, regions and TEN extensions per
+option: https://claude.ai/artifact/UcvVR8mFgEUXtN2575CejT
+
 ## What to deploy
 
 | Stage | Laptop / CI | Production, Singapore |

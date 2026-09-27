@@ -29,7 +29,7 @@ ARG TEN_BUILD_IMAGE_VERSION=0.7.14
 # Cloned rather than vendored into this repo: the tag IS the pin, a clone is
 # reviewable by diffing against it, and only PATCHED extensions need to live
 # in this repo (extensions/vendor/, docs/05-ten.md §7).
-FROM alpine/git:2.45.2 AS ten-src
+FROM mirror.gcr.io/alpine/git:2.45.2 AS ten-src
 ARG TEN_VERSION
 WORKDIR /src
 RUN git clone --depth 1 --branch ${TEN_VERSION} \
@@ -51,7 +51,7 @@ ENV PIP_FLAGS=""
 # 24.04, not 22.04: the arm64 `tman` in the release is linked against glibc
 # 2.38/2.39 and 22.04 ships 2.35, so it will not start at all. The amd64 leg
 # keeps TEN's own 22.04-based image, which is what upstream tests.
-FROM ubuntu:24.04 AS builder-arm64
+FROM mirror.gcr.io/library/ubuntu:24.04 AS builder-arm64
 ARG TEN_VERSION
 ENV TEN_ARCH_SOURCE=release
 ENV PIP_FLAGS="--break-system-packages"
@@ -84,6 +84,14 @@ ARG TEN_VERSION
 ARG TARGETARCH
 WORKDIR /app
 
+# huggingface-hub below 2. The extensions' requirements are upstream's and
+# unpinned, so faster-whisper takes whatever hub is newest; 2.0.0 (2026-09-24)
+# moved to httpx2, and the builder images' pip 22 resolver dies on the result
+# with an AssertionError in get_topological_weights. A major version nobody
+# here has run is also not one to adopt by accident. Every pip3 below reads it.
+RUN printf 'huggingface-hub<2\n' > /etc/pip-constraints.txt
+ENV PIP_CONSTRAINT=/etc/pip-constraints.txt
+
 COPY --from=ten-src /src/ten/ai_agents/server/            server/
 COPY --from=ten-src /src/ten/ai_agents/agents/scripts/    agents/scripts/
 COPY --from=ten-src /src/ten/ai_agents/agents/ten_packages/ agents/ten_packages/
@@ -95,6 +103,13 @@ COPY extensions/            agents/ten_packages/extension/
 COPY tenapp/                agents/analyst_line/tenapp/
 
 WORKDIR /app/agents/analyst_line/tenapp
+# The runtime is pinned EXACTLY in the manifests (`=0.11.71`), not as `0.11`.
+# A range let tman plan to replace the aarch64 runtime placed below with the
+# registry's newer x64-only one (0.11.73 on 2026-09-27), and it then installed
+# nothing at all, so the next step found no extensions. The pin has to move
+# with TEN_VERSION, and this fails the build if it does not.
+RUN grep -q "\"=${TEN_VERSION}\"" manifest.json \
+ || { echo "tenapp/manifest.json does not pin the runtime to =${TEN_VERSION}" >&2; exit 1; }
 RUN set -eux; \
     if [ "$TEN_ARCH_SOURCE" = "release" ]; then \
       # The registry has no aarch64 runtime; place it, then let tman resolve
@@ -164,7 +179,7 @@ RUN tman package --output-path /tmp/app.tar 2>/dev/null || true
 # Also 24.04, for the same reason on the arm64 leg -- the runtime libraries in
 # the release need it. amd64 binaries built on 22.04 run here unchanged, glibc
 # being backward compatible; the reverse is what fails.
-FROM ubuntu:24.04
+FROM mirror.gcr.io/library/ubuntu:24.04
 ARG TEN_VERSION
 LABEL org.opencontainers.image.title="data-agent-voice / analyst-line" \
       org.opencontainers.image.description="TEN graph for the Analyst Line: WebSocket in, local ASR/TTS, Claude host, the ask service behind it" \

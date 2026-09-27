@@ -84,6 +84,14 @@ ARG TEN_VERSION
 ARG TARGETARCH
 WORKDIR /app
 
+# huggingface-hub below 2. The extensions' requirements are upstream's and
+# unpinned, so faster-whisper takes whatever hub is newest; 2.0.0 (2026-09-24)
+# moved to httpx2, and the builder images' pip 22 resolver dies on the result
+# with an AssertionError in get_topological_weights. A major version nobody
+# here has run is also not one to adopt by accident. Every pip3 below reads it.
+RUN printf 'huggingface-hub<2\n' > /etc/pip-constraints.txt
+ENV PIP_CONSTRAINT=/etc/pip-constraints.txt
+
 COPY --from=ten-src /src/ten/ai_agents/server/            server/
 COPY --from=ten-src /src/ten/ai_agents/agents/scripts/    agents/scripts/
 COPY --from=ten-src /src/ten/ai_agents/agents/ten_packages/ agents/ten_packages/

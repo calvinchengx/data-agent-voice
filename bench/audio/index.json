@@ -1,0 +1,38 @@
+[
+ {
+  "file": "00.wav",
+  "text": "Sure, let me check that.",
+  "speech_end_ms": 1453.4,
+  "duration_ms": 2953.4
+ },
+ {
+  "file": "01.wav",
+  "text": "One moment while I look it up.",
+  "speech_end_ms": 1724.0,
+  "duration_ms": 3224.0
+ },
+ {
+  "file": "02.wav",
+  "text": "Revenue last quarter was four point two million dollars.",
+  "speech_end_ms": 3274.6,
+  "duration_ms": 4774.6
+ },
+ {
+  "file": "03.wav",
+  "text": "Active customers are counted by at least one order in the last ninety days.",
+  "speech_end_ms": 4495.8,
+  "duration_ms": 5995.8
+ },
+ {
+  "file": "04.wav",
+  "text": "That figure excludes refunds, which the catalog flags as a known caveat.",
+  "speech_end_ms": 4536.6,
+  "duration_ms": 6036.6
+ },
+ {
+  "file": "05.wav",
+  "text": "I can't answer that one, because you don't have access to the payroll tables.",
+  "speech_end_ms": 4306.2,
+  "duration_ms": 5806.2
+ }
+]

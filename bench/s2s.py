@@ -18,14 +18,14 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import contextlib
 import json
 import os
 
 from bench.common import Run, load_env, now_ms, save, summarize, tcp_rtt_ms
 from bench.stt import FRAME_MS, fixtures
 
-INSTRUCTIONS = ("You are a brief voice assistant for a data team. Answer in one short "
-                "sentence.")
+INSTRUCTIONS = "You are a brief voice assistant for a data team. Answer in one short sentence."
 
 
 def upsample_16_to_24(pcm16: bytes) -> bytes:
@@ -44,19 +44,38 @@ class OpenAIRealtime:
 
     async def connect(self):
         import websockets
+
         ws = await websockets.connect(
             f"wss://api.openai.com/v1/realtime?model={self.model}",
-            additional_headers={"Authorization": f"Bearer {os.environ[self.key_var]}"})
-        await ws.send(json.dumps({"type": "session.update", "session": {
-            "type": "realtime", "instructions": INSTRUCTIONS,
-            "audio": {"input": {"format": {"type": "audio/pcm", "rate": 24000},
-                                "turn_detection": {"type": "server_vad"}},
-                      "output": {"format": {"type": "audio/pcm", "rate": 24000}}}}}))
+            additional_headers={"Authorization": f"Bearer {os.environ[self.key_var]}"},
+        )
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "session.update",
+                    "session": {
+                        "type": "realtime",
+                        "instructions": INSTRUCTIONS,
+                        "audio": {
+                            "input": {
+                                "format": {"type": "audio/pcm", "rate": 24000},
+                                "turn_detection": {"type": "server_vad"},
+                            },
+                            "output": {"format": {"type": "audio/pcm", "rate": 24000}},
+                        },
+                    },
+                }
+            )
+        )
         return ws
 
     def frame(self, pcm16k: bytes):
-        return json.dumps({"type": "input_audio_buffer.append",
-                           "audio": base64.b64encode(upsample_16_to_24(pcm16k)).decode()})
+        return json.dumps(
+            {
+                "type": "input_audio_buffer.append",
+                "audio": base64.b64encode(upsample_16_to_24(pcm16k)).decode(),
+            }
+        )
 
     def is_first_audio(self, msg) -> bool:
         m = json.loads(msg)
@@ -70,19 +89,36 @@ class GeminiLive:
 
     async def connect(self):
         import websockets
+
         ws = await websockets.connect(
             "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta."
-            f"GenerativeService.BidiGenerateContent?key={os.environ[self.key_var]}")
-        await ws.send(json.dumps({"setup": {
-            "model": f"models/{self.model}",
-            "generationConfig": {"responseModalities": ["AUDIO"]},
-            "systemInstruction": {"parts": [{"text": INSTRUCTIONS}]}}}))
+            f"GenerativeService.BidiGenerateContent?key={os.environ[self.key_var]}"
+        )
+        await ws.send(
+            json.dumps(
+                {
+                    "setup": {
+                        "model": f"models/{self.model}",
+                        "generationConfig": {"responseModalities": ["AUDIO"]},
+                        "systemInstruction": {"parts": [{"text": INSTRUCTIONS}]},
+                    }
+                }
+            )
+        )
         await ws.recv()  # setupComplete
         return ws
 
     def frame(self, pcm16k: bytes):
-        return json.dumps({"realtimeInput": {"audio": {
-            "mimeType": "audio/pcm;rate=16000", "data": base64.b64encode(pcm16k).decode()}}})
+        return json.dumps(
+            {
+                "realtimeInput": {
+                    "audio": {
+                        "mimeType": "audio/pcm;rate=16000",
+                        "data": base64.b64encode(pcm16k).decode(),
+                    }
+                }
+            }
+        )
 
     def is_first_audio(self, msg) -> bool:
         m = json.loads(msg)
@@ -110,17 +146,15 @@ async def one(p, fx: dict) -> Run:
     rx = asyncio.create_task(recv())
     t0 = now_ms()
     for k, off in enumerate(range(0, len(pcm), step)):
-        chunk = pcm[off: off + step]
+        chunk = pcm[off : off + step]
         await ws.send(p.frame(chunk))
         if not t_end and off + len(chunk) >= end_byte:
             t_end.append(now_ms())
         if got:
             break
         await asyncio.sleep(max(0.0, (t0 + (k + 1) * FRAME_MS - now_ms()) / 1000))
-    try:
+    with contextlib.suppress(TimeoutError):
         await asyncio.wait_for(rx, timeout=15)
-    except TimeoutError:
-        pass
     await ws.close()
     if not got:
         return Run(p.name, p.model, "s2s", fx["text"], True, None, error="no reply audio")
@@ -139,7 +173,9 @@ async def main() -> int:
         p = PROVIDERS[name]()
         if not os.environ.get(p.key_var):
             print(f"{name:<16} skipped: {p.key_var} not set")
-            runs.append(Run(name, p.model, "s2s", "", True, None, error=f"skipped: {p.key_var} not set"))
+            runs.append(
+                Run(name, p.model, "s2s", "", True, None, error=f"skipped: {p.key_var} not set")
+            )
             continue
         rtt = tcp_rtt_ms(p.url)
         r = []
@@ -152,8 +188,10 @@ async def main() -> int:
                 run.extra["rtt_ms"] = rtt
                 r.append(run)
         s = summarize([x.value_ms for x in r if x.value_ms is not None])
-        print(f"{name:<16} rtt={rtt and round(rtt)}  v2v p50={s.get('p50')} p90={s.get('p90')} ms  "
-              f"errors={sum(1 for x in r if x.error)}")
+        print(
+            f"{name:<16} rtt={rtt and round(rtt)}  v2v p50={s.get('p50')} p90={s.get('p90')} ms  "
+            f"errors={sum(1 for x in r if x.error)}"
+        )
         runs += r
     print(f"\nwrote {save('s2s', runs, {'reps': args.reps})}")
     return 0

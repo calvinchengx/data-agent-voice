@@ -93,7 +93,7 @@ def tcp_rtt_ms(url: str, samples: int = 5) -> float | None:
 class Run:
     provider: str
     model: str
-    kind: str          # tts | stt | s2s
+    kind: str  # tts | stt | s2s
     text: str
     warm: bool
     value_ms: float | None
@@ -109,19 +109,31 @@ def summarize(values: list[float]) -> dict:
     def pct(p: float) -> float:
         return v[min(len(v) - 1, round(p * (len(v) - 1)))]
 
-    return {"n": len(v), "p50": round(pct(0.5), 1), "p90": round(pct(0.9), 1),
-            "min": round(v[0], 1), "max": round(v[-1], 1)}
+    return {
+        "n": len(v),
+        "p50": round(pct(0.5), 1),
+        "p90": round(pct(0.9), 1),
+        "min": round(v[0], 1),
+        "max": round(v[-1], 1),
+    }
 
 
 def machine() -> dict:
-    return {"host": platform.node(), "platform": platform.platform(),
-            "processor": platform.processor() or platform.machine(),
-            "when": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+    return {
+        "host": platform.node(),
+        "platform": platform.platform(),
+        "processor": platform.processor() or platform.machine(),
+        "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    }
 
 
 def save(kind: str, runs: list[Run], meta: dict) -> Path:
     RESULTS.mkdir(parents=True, exist_ok=True)
     path = RESULTS / f"{kind}-{time.strftime('%Y%m%d-%H%M%S')}.json"
-    path.write_text(json.dumps({"machine": machine(), "meta": meta,
-                                "runs": [asdict(r) for r in runs]}, indent=1) + "\n")
+    path.write_text(
+        json.dumps(
+            {"machine": machine(), "meta": meta, "runs": [asdict(r) for r in runs]}, indent=1
+        )
+        + "\n"
+    )
     return path

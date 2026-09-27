@@ -34,15 +34,18 @@ def main() -> int:
     AUDIO.mkdir(parents=True, exist_ok=True)
     index = []
     for i, text in enumerate(CORPUS):
-        chunks = [np.asarray(r.audio, dtype=np.float32)
-                  for r in model.generate(text=text, voice="af_heart", lang_code="a")]
+        chunks = [
+            np.asarray(r.audio, dtype=np.float32)
+            for r in model.generate(text=text, voice="af_heart", lang_code="a")
+        ]
         speech = resample_poly(np.concatenate(chunks), SR, src_sr)
         # Trim the model's own leading/trailing near-silence so "speech end" is
         # where the voice actually stops, not where the model padded.
         voiced = np.flatnonzero(np.abs(speech) > 0.01)
-        speech = speech[voiced[0]: voiced[-1] + 1]
-        pcm = np.concatenate([np.zeros(SR * LEAD_MS // 1000), speech,
-                              np.zeros(SR * TAIL_MS // 1000)])
+        speech = speech[voiced[0] : voiced[-1] + 1]
+        pcm = np.concatenate(
+            [np.zeros(SR * LEAD_MS // 1000), speech, np.zeros(SR * TAIL_MS // 1000)]
+        )
         pcm16 = (np.clip(pcm, -1, 1) * 32767).astype("<i2")
         name = f"{i:02d}.wav"
         with wave.open(str(AUDIO / name), "wb") as w:
@@ -50,9 +53,14 @@ def main() -> int:
             w.setsampwidth(2)
             w.setframerate(SR)
             w.writeframes(pcm16.tobytes())
-        index.append({"file": name, "text": text,
-                      "speech_end_ms": round((SR * LEAD_MS // 1000 + len(speech)) / SR * 1000, 1),
-                      "duration_ms": round(len(pcm16) / SR * 1000, 1)})
+        index.append(
+            {
+                "file": name,
+                "text": text,
+                "speech_end_ms": round((SR * LEAD_MS // 1000 + len(speech)) / SR * 1000, 1),
+                "duration_ms": round(len(pcm16) / SR * 1000, 1),
+            }
+        )
     (AUDIO / "index.json").write_text(json.dumps(index, indent=1) + "\n")
     print(f"wrote {len(index)} files to {AUDIO}")
     return 0

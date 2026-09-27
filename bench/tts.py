@@ -33,7 +33,7 @@ def env(name: str, default: str) -> str:
 
 class Provider:
     name = ""
-    url = ""          # for the RTT probe
+    url = ""  # for the RTT probe
     key_var: str | None = None
 
     def model(self) -> str:
@@ -49,6 +49,7 @@ class Provider:
 
 
 # ------------------------------------------------------------------ HTTP family
+
 
 class HttpStream(Provider):
     """A provider that answers one POST with a chunked audio body."""
@@ -94,9 +95,17 @@ class Kokoro(HttpStream):
         return "kokoro:" + env("BENCH_KOKORO_VOICE", "af_heart")
 
     def request(self, text):
-        return (f"{self.url}/v1/audio/speech", {},
-                {"model": "kokoro", "input": text, "voice": env("BENCH_KOKORO_VOICE", "af_heart"),
-                 "response_format": "pcm", "stream": True})
+        return (
+            f"{self.url}/v1/audio/speech",
+            {},
+            {
+                "model": "kokoro",
+                "input": text,
+                "voice": env("BENCH_KOKORO_VOICE", "af_heart"),
+                "response_format": "pcm",
+                "stream": True,
+            },
+        )
 
 
 class ElevenLabsHttp(HttpStream):
@@ -111,9 +120,11 @@ class ElevenLabsHttp(HttpStream):
 
     def request(self, text):
         voice = env("BENCH_ELEVENLABS_VOICE", "21m00Tcm4TlvDq8ikWAM")
-        return (f"{self.url}/v1/text-to-speech/{voice}/stream?output_format=pcm_16000",
-                {"xi-api-key": os.environ[self.key_var]},
-                {"text": text, "model_id": self.model()})
+        return (
+            f"{self.url}/v1/text-to-speech/{voice}/stream?output_format=pcm_16000",
+            {"xi-api-key": os.environ[self.key_var]},
+            {"text": text, "model_id": self.model()},
+        )
 
 
 class OpenAITTS(HttpStream):
@@ -123,13 +134,20 @@ class OpenAITTS(HttpStream):
         return env("BENCH_OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
 
     def request(self, text):
-        return ("https://api.openai.com/v1/audio/speech",
-                {"Authorization": f"Bearer {os.environ[self.key_var]}"},
-                {"model": self.model(), "input": text,
-                 "voice": env("BENCH_OPENAI_VOICE", "alloy"), "response_format": "pcm"})
+        return (
+            "https://api.openai.com/v1/audio/speech",
+            {"Authorization": f"Bearer {os.environ[self.key_var]}"},
+            {
+                "model": self.model(),
+                "input": text,
+                "voice": env("BENCH_OPENAI_VOICE", "alloy"),
+                "response_format": "pcm",
+            },
+        )
 
 
 # -------------------------------------------------------------- WebSocket family
+
 
 class ElevenLabsWS(Provider):
     """stream-input: text in, audio out, one connection per utterance.
@@ -148,12 +166,15 @@ class ElevenLabsWS(Provider):
 
     async def ttfa(self, text):
         voice = env("BENCH_ELEVENLABS_VOICE", "21m00Tcm4TlvDq8ikWAM")
-        uri = (f"wss://api.elevenlabs.io/v1/text-to-speech/{voice}/stream-input"
-               f"?model_id={self.model()}&output_format=pcm_16000")
+        uri = (
+            f"wss://api.elevenlabs.io/v1/text-to-speech/{voice}/stream-input"
+            f"?model_id={self.model()}&output_format=pcm_16000&auto_mode=true"
+        )
         t0 = now_ms()
         first, total = None, 0
         async with websockets.connect(
-                uri, additional_headers={"xi-api-key": os.environ[self.key_var]}) as ws:
+            uri, additional_headers={"xi-api-key": os.environ[self.key_var]}
+        ) as ws:
             await ws.send(json.dumps({"text": " "}))
             await ws.send(json.dumps({"text": text + " ", "flush": True}))
             await ws.send(json.dumps({"text": ""}))
@@ -176,12 +197,16 @@ class Cartesia(Provider):
     ws = None
 
     def model(self) -> str:
-        return env("BENCH_CARTESIA_MODEL", "sonic-2")
+        return env("BENCH_CARTESIA_MODEL", "sonic-3.6")
 
     async def open(self):
-        uri = (f"wss://api.cartesia.ai/tts/websocket?api_key={os.environ[self.key_var]}"
-               f"&cartesia_version={env('BENCH_CARTESIA_VERSION', '2025-04-16')}")
-        self.ws = await websockets.connect(uri)
+        uri = (
+            "wss://api.cartesia.ai/tts/websocket"
+            f"?cartesia_version={env('BENCH_CARTESIA_VERSION', '2026-08-14')}"
+        )
+        self.ws = await websockets.connect(
+            uri, additional_headers={"X-API-Key": os.environ[self.key_var]}
+        )
 
     async def close(self):
         if self.ws:
@@ -189,12 +214,18 @@ class Cartesia(Provider):
 
     async def ttfa(self, text):
         ctx = str(uuid.uuid4())
-        req = {"model_id": self.model(), "transcript": text, "context_id": ctx,
-               "voice": {"mode": "id", "id": env("BENCH_CARTESIA_VOICE",
-                                                 "a0e99841-438c-4a64-b679-ae501e7d6091")},
-               "output_format": {"container": "raw", "encoding": "pcm_s16le",
-                                 "sample_rate": 16000},
-               "language": "en", "continue": False}
+        req = {
+            "model_id": self.model(),
+            "transcript": text,
+            "context_id": ctx,
+            "voice": {
+                "mode": "id",
+                "id": env("BENCH_CARTESIA_VOICE", "a0e99841-438c-4a64-b679-ae501e7d6091"),
+            },
+            "output_format": {"container": "raw", "encoding": "pcm_s16le", "sample_rate": 16000},
+            "language": "en",
+            "continue": False,
+        }
         t0 = now_ms()
         await self.ws.send(json.dumps(req))
         first, total = None, 0
@@ -224,10 +255,13 @@ class DeepgramAura(Provider):
         return env("BENCH_DEEPGRAM_TTS_MODEL", "aura-2-thalia-en")
 
     async def open(self):
-        uri = (f"wss://api.deepgram.com/v1/speak?model={self.model()}"
-               f"&encoding=linear16&sample_rate=16000")
+        uri = (
+            f"wss://api.deepgram.com/v1/speak?model={self.model()}"
+            f"&encoding=linear16&sample_rate=16000"
+        )
         self.ws = await websockets.connect(
-            uri, additional_headers={"Authorization": f"Token {os.environ[self.key_var]}"})
+            uri, additional_headers={"Authorization": f"Token {os.environ[self.key_var]}"}
+        )
 
     async def close(self):
         if self.ws:
@@ -252,8 +286,58 @@ class DeepgramAura(Provider):
         return first, total
 
 
+class Inworld(Provider):
+    """Inworld TTS over its streaming HTTP endpoint (newline-delimited JSON).
+
+    Fastest on Coval (TTS-2 Flash, us-east-1). The bidirectional WebSocket is
+    what a live line would hold open; the HTTP stream is used here because its
+    request shape is the documented one, so warm = HTTP keep-alive.
+    """
+
+    name, key_var, url = "inworld", "INWORLD_API_KEY", "https://api.inworld.ai"
+    client: httpx.AsyncClient | None = None
+
+    def model(self) -> str:
+        return env("BENCH_INWORLD_MODEL", "inworld-tts-2-flash")
+
+    async def open(self):
+        self.client = httpx.AsyncClient(timeout=30.0)
+
+    async def close(self):
+        if self.client:
+            await self.client.aclose()
+
+    async def ttfa(self, text):
+        body = {
+            "text": text,
+            "voiceId": env("BENCH_INWORLD_VOICE", "Ashley"),
+            "modelId": self.model(),
+            "audioConfig": {"audioEncoding": "LINEAR16", "sampleRateHertz": 16000},
+        }
+        headers = {"Authorization": f"Basic {os.environ[self.key_var]}"}
+        t0 = now_ms()
+        first, total = None, 0
+        async with self.client.stream(
+            "POST", "https://api.inworld.ai/tts/v1/voice:stream", headers=headers, json=body
+        ) as r:
+            if r.status_code >= 400:
+                raise RuntimeError(f"HTTP {r.status_code}: {(await r.aread())[:200]!r}")
+            async for line in r.aiter_lines():
+                if not line.strip():
+                    continue
+                audio = (json.loads(line).get("result") or {}).get("audioContent")
+                if audio:
+                    if first is None:
+                        first = now_ms() - t0
+                    total += len(base64.b64decode(audio))
+        if first is None:
+            raise RuntimeError("no audio")
+        return first, total
+
+
 PROVIDERS: dict[str, type[Provider]] = {
-    p.name: p for p in (Kokoro, ElevenLabsHttp, ElevenLabsWS, Cartesia, DeepgramAura, OpenAITTS)
+    p.name: p
+    for p in (Kokoro, ElevenLabsHttp, ElevenLabsWS, Cartesia, DeepgramAura, Inworld, OpenAITTS)
 }
 
 
@@ -274,8 +358,17 @@ async def bench(name: str, reps: int) -> list[Run]:
             await q.open()
             opened = now_ms() - t0
             ms, n = await q.ttfa(text)
-            runs.append(Run(name, q.model(), "tts", text, False, opened + ms,
-                            extra={"bytes": n, "rtt_ms": rtt, "open_ms": round(opened, 1)}))
+            runs.append(
+                Run(
+                    name,
+                    q.model(),
+                    "tts",
+                    text,
+                    False,
+                    opened + ms,
+                    extra={"bytes": n, "rtt_ms": rtt, "open_ms": round(opened, 1)},
+                )
+            )
         except Exception as e:  # a failed run is a row, not a crash
             runs.append(Run(name, q.model(), "tts", text, False, None, error=str(e)[:200]))
         finally:
@@ -288,8 +381,17 @@ async def bench(name: str, reps: int) -> list[Run]:
             for text in CORPUS:
                 try:
                     ms, n = await p.ttfa(text)
-                    runs.append(Run(name, p.model(), "tts", text, True, ms,
-                                    extra={"bytes": n, "rtt_ms": rtt}))
+                    runs.append(
+                        Run(
+                            name,
+                            p.model(),
+                            "tts",
+                            text,
+                            True,
+                            ms,
+                            extra={"bytes": n, "rtt_ms": rtt},
+                        )
+                    )
                 except Exception as e:
                     runs.append(Run(name, p.model(), "tts", text, True, None, error=str(e)[:200]))
     finally:
@@ -297,8 +399,10 @@ async def bench(name: str, reps: int) -> list[Run]:
     warm = summarize([r.value_ms for r in runs if r.warm and r.value_ms is not None])
     cold = summarize([r.value_ms for r in runs if not r.warm and r.value_ms is not None])
     errs = sum(1 for r in runs if r.error)
-    print(f"{name:<14} {p.model():<28} rtt={rtt and round(rtt)}ms  warm p50={warm.get('p50')} "
-          f"p90={warm.get('p90')}  cold p50={cold.get('p50')}  errors={errs}")
+    print(
+        f"{name:<14} {p.model():<28} rtt={rtt and round(rtt)}ms  warm p50={warm.get('p50')} "
+        f"p90={warm.get('p90')}  cold p50={cold.get('p50')}  errors={errs}"
+    )
     return runs
 
 

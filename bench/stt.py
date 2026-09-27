@@ -22,8 +22,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import contextlib
 import json
 import os
+import pathlib
 import re
 import wave
 
@@ -57,6 +59,7 @@ def wer(ref: str, hyp: str) -> float:
 
 # ------------------------------------------------------------------- streaming
 
+
 class Streamer:
     """Base for WebSocket providers: send frames in real time, await the final."""
 
@@ -69,7 +72,7 @@ class Streamer:
         raise NotImplementedError
 
     def frame(self, pcm: bytes):
-        return pcm            # what one audio frame looks like on the wire
+        return pcm  # what one audio frame looks like on the wire
 
     async def finalize(self, ws) -> None:
         """Ask for a final now (only used if endpointing never fired)."""
@@ -90,7 +93,7 @@ class Streamer:
         async def send():
             t0 = now_ms()
             for k, off in enumerate(range(0, len(pcm), step)):
-                chunk = pcm[off: off + step]
+                chunk = pcm[off : off + step]
                 await ws.send(self.frame(chunk))
                 if not t_end and off + len(chunk) >= end_byte:
                     t_end.append(now_ms())
@@ -111,16 +114,21 @@ class Streamer:
         if not final:
             forced = True
             await self.finalize(ws)
-        try:
+        with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(rx, timeout=10)
-        except TimeoutError:
-            pass
         await ws.close()
         if not final:
             return Run(self.name, self.model, "stt", fx["text"], True, None, error="no final")
         t, text = final[0]
-        return Run(self.name, self.model, "stt", fx["text"], True, t - t_end[0],
-                   extra={"forced": forced, "hyp": text, "wer": round(wer(fx["text"], text), 3)})
+        return Run(
+            self.name,
+            self.model,
+            "stt",
+            fx["text"],
+            True,
+            t - t_end[0],
+            extra={"forced": forced, "hyp": text, "wer": round(wer(fx["text"], text), 3)},
+        )
 
 
 class DeepgramFlux(Streamer):
@@ -129,10 +137,12 @@ class DeepgramFlux(Streamer):
 
     async def connect(self):
         import websockets
+
         return await websockets.connect(
             f"wss://api.deepgram.com/v2/listen?model={self.model}&encoding=linear16"
             f"&sample_rate=16000&eot_threshold=0.7",
-            additional_headers={"Authorization": f"Token {os.environ[self.key_var]}"})
+            additional_headers={"Authorization": f"Token {os.environ[self.key_var]}"},
+        )
 
     def final_text(self, msg):
         m = json.loads(msg) if isinstance(msg, str) else {}
@@ -147,11 +157,13 @@ class DeepgramNova(Streamer):
 
     async def connect(self):
         import websockets
+
         self.parts: list[str] = []
         return await websockets.connect(
             f"wss://api.deepgram.com/v1/listen?model={self.model}&encoding=linear16"
             f"&sample_rate=16000&interim_results=true&endpointing=300&smart_format=true",
-            additional_headers={"Authorization": f"Token {os.environ[self.key_var]}"})
+            additional_headers={"Authorization": f"Token {os.environ[self.key_var]}"},
+        )
 
     async def finalize(self, ws):
         await ws.send(json.dumps({"type": "Finalize"}))
@@ -177,10 +189,20 @@ class Soniox(Streamer):
 
     async def connect(self):
         import websockets
+
         ws = await websockets.connect(f"wss://{self.host}/transcribe-websocket")
-        await ws.send(json.dumps({"api_key": os.environ[self.key_var], "model": self.model,
-                                  "audio_format": "pcm_s16le", "sample_rate": 16000,
-                                  "num_channels": 1, "enable_endpoint_detection": True}))
+        await ws.send(
+            json.dumps(
+                {
+                    "api_key": os.environ[self.key_var],
+                    "model": self.model,
+                    "audio_format": "pcm_s16le",
+                    "sample_rate": 16000,
+                    "num_channels": 1,
+                    "enable_endpoint_detection": True,
+                }
+            )
+        )
         self.tokens: list[str] = []
         return ws
 
@@ -206,10 +228,12 @@ class AssemblyAI(Streamer):
 
     async def connect(self):
         import websockets
+
         return await websockets.connect(
             f"wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&encoding=pcm_s16le"
             f"&speech_model={self.model}&format_turns=true",
-            additional_headers={"Authorization": os.environ[self.key_var]})
+            additional_headers={"Authorization": os.environ[self.key_var]},
+        )
 
     async def finalize(self, ws):
         await ws.send(json.dumps({"type": "ForceEndpoint"}))
@@ -227,19 +251,33 @@ class ElevenLabsScribe(Streamer):
 
     async def connect(self):
         import websockets
+
         return await websockets.connect(
             f"wss://api.elevenlabs.io/v1/speech-to-text/realtime?model_id={self.model}"
             f"&audio_format=pcm_16000&commit_strategy=vad",
-            additional_headers={"xi-api-key": os.environ[self.key_var]})
+            additional_headers={"xi-api-key": os.environ[self.key_var]},
+        )
 
     def frame(self, pcm):
-        return json.dumps({"message_type": "input_audio_chunk",
-                           "audio_base_64": base64.b64encode(pcm).decode(),
-                           "sample_rate": 16000})
+        return json.dumps(
+            {
+                "message_type": "input_audio_chunk",
+                "audio_base_64": base64.b64encode(pcm).decode(),
+                "sample_rate": 16000,
+            }
+        )
 
     async def finalize(self, ws):
-        await ws.send(json.dumps({"message_type": "input_audio_chunk", "audio_base_64": "",
-                                  "commit": True, "sample_rate": 16000}))
+        await ws.send(
+            json.dumps(
+                {
+                    "message_type": "input_audio_chunk",
+                    "audio_base_64": "",
+                    "commit": True,
+                    "sample_rate": 16000,
+                }
+            )
+        )
 
     def final_text(self, msg):
         m = json.loads(msg) if isinstance(msg, str) else {}
@@ -254,7 +292,7 @@ STREAMERS = {c.name: c for c in (DeepgramFlux, DeepgramNova, Soniox, AssemblyAI,
 # ----------------------------------------------------------------------- local
 
 LOCAL = {
-    "whisper-base": ("base", "int8"),       # the graph's default (tenapp/property.json)
+    "whisper-base": ("base", "int8"),  # the graph's default (tenapp/property.json)
     "whisper-small": ("small", "int8"),
     "whisper-turbo": ("large-v3-turbo", "int8"),
 }
@@ -280,9 +318,67 @@ def local_whisper(label: str, fxs: list[dict], reps: int) -> list[Run]:
     for _ in range(reps):
         for fx in fxs:
             ms, text = decode(fx)
-            runs.append(Run(label, f"faster-whisper {size} {compute} cpu", "stt", fx["text"],
-                            True, ms, extra={"eou_ms": FIXED_EOU_MS, "hyp": text,
-                                             "wer": round(wer(fx["text"], text), 3)}))
+            runs.append(
+                Run(
+                    label,
+                    f"faster-whisper {size} {compute} cpu",
+                    "stt",
+                    fx["text"],
+                    True,
+                    ms,
+                    extra={
+                        "eou_ms": FIXED_EOU_MS,
+                        "hyp": text,
+                        "wer": round(wer(fx["text"], text), 3),
+                    },
+                )
+            )
+    return runs
+
+
+def local_parakeet(label: str, fxs: list[dict], reps: int) -> list[Run]:
+    """NVIDIA Parakeet TDT on Apple Metal (parakeet-mlx), offline like Whisper."""
+    import tempfile
+    import wave as _wave
+
+    from parakeet_mlx import from_pretrained
+
+    repo = os.environ.get("BENCH_PARAKEET_MODEL", "mlx-community/parakeet-tdt-0.6b-v3")
+    model = from_pretrained(repo)
+    tmp = pathlib.Path(tempfile.mkdtemp())
+
+    def decode(fx):
+        seg = fx["pcm"][: int(fx["speech_end_ms"] / 1000 * fx["sr"]) * 2]
+        path = tmp / fx["file"]
+        with _wave.open(str(path), "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(fx["sr"])
+            w.writeframes(seg)
+        t0 = now_ms()
+        text = model.transcribe(str(path)).text.strip()
+        return now_ms() - t0, text
+
+    decode(fxs[0])
+    runs = []
+    for _ in range(reps):
+        for fx in fxs:
+            ms, text = decode(fx)
+            runs.append(
+                Run(
+                    label,
+                    f"{repo} mlx",
+                    "stt",
+                    fx["text"],
+                    True,
+                    ms,
+                    extra={
+                        "eou_ms": FIXED_EOU_MS,
+                        "hyp": text,
+                        "wer": round(wer(fx["text"], text), 3),
+                    },
+                )
+            )
     return runs
 
 
@@ -291,8 +387,10 @@ def report(label: str, runs: list[Run], rtt=None) -> None:
     s = summarize([r.value_ms for r in ok])
     w = summarize([r.extra["wer"] for r in ok])
     forced = sum(1 for r in ok if r.extra.get("forced"))
-    print(f"{label:<18} rtt={rtt and round(rtt)}  final p50={s.get('p50')} p90={s.get('p90')} ms  "
-          f"wer p50={w.get('p50')}  forced={forced}  errors={len(runs) - len(ok)}")
+    print(
+        f"{label:<18} rtt={rtt and round(rtt)}  final p50={s.get('p50')} p90={s.get('p90')} ms  "
+        f"wer p50={w.get('p50')}  forced={forced}  errors={len(runs) - len(ok)}"
+    )
 
 
 async def main() -> int:
@@ -304,15 +402,17 @@ async def main() -> int:
     fxs = fixtures()
     runs: list[Run] = []
     for name in args.providers:
-        if name in LOCAL:
-            r = local_whisper(name, fxs, args.reps)
+        if name in LOCAL or name == "parakeet-mlx":
+            r = (local_parakeet if name == "parakeet-mlx" else local_whisper)(name, fxs, args.reps)
             report(name, r)
             runs += r
             continue
         s = STREAMERS[name]()
         if not os.environ.get(s.key_var):
             print(f"{name:<18} skipped: {s.key_var} not set")
-            runs.append(Run(name, s.model, "stt", "", True, None, error=f"skipped: {s.key_var} not set"))
+            runs.append(
+                Run(name, s.model, "stt", "", True, None, error=f"skipped: {s.key_var} not set")
+            )
             continue
         rtt = tcp_rtt_ms(s.url)
         r = []

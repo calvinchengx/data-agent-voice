@@ -1,7 +1,7 @@
 """Open TTS models, run natively on this machine, time to first audio in-process.
 
     uv run --no-project --python 3.12 --with mlx-audio --with sentencepiece \\
-        --with piper-tts --with numpy python -m bench.local_tts [label ...]
+        --with 'misaki[en]' --with piper-tts --with numpy python -m bench.local_tts [label ...]
 
 No network and no container: the value is generate() called -> first audio
 chunk returned, so it is the model's own floor on this hardware. A deployment
@@ -33,11 +33,11 @@ from bench.common import CORPUS, Run, now_ms, save, summarize
 # label: (backend, model id, voice, extra generate kwargs)
 MODELS = {
     "kokoro-mlx": ("mlx", "prince-canuma/Kokoro-82M", "af_heart", {"lang_code": "a"}),
-    "soprano-mlx": ("mlx", "ekwek/Soprano-80M", None, {}),
-    "kitten-mlx": ("mlx", "KittenML/kitten-tts-nano-0.2", "expr-voice-5-m", {}),
+    "soprano-mlx": ("mlx", "mlx-community/Soprano-80M-bf16", None, {}),
+    "kitten-mlx": ("mlx", "mlx-community/kitten-tts-nano-0.8", "expr-voice-5-m", {}),
     "pocket-mlx": ("mlx", "kyutai/pocket-tts", None, {}),
     "qwen3tts-mlx": ("mlx", "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16", None, {}),
-    "moss-nano-mlx": ("mlx", "mlx-community/MOSS-TTS-Nano-100M", None, {}),
+    "moss-nano-mlx": ("mlx", "mlx-community/MOSS-TTS-Nano-100M", None, {"stream": False}),
     "piper-cpu": ("piper", "en_US-lessac-medium", None, {}),
 }
 
@@ -87,8 +87,10 @@ def piper_runner(voice_name: str, _voice, _extra):
 
         cache.mkdir(parents=True, exist_ok=True)
         lang, name, quality = voice_name.split("-")
-        base = ("https://huggingface.co/rhasspy/piper-voices/resolve/main/"
-                f"en/{lang}/{name}/{quality}/{voice_name}")
+        base = (
+            "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
+            f"en/{lang}/{name}/{quality}/{voice_name}"
+        )
         for suffix in (".onnx", ".onnx.json"):
             urllib.request.urlretrieve(base + suffix, cache / f"{voice_name}{suffix}")
     voice = PiperVoice.load(str(onnx))
@@ -123,17 +125,30 @@ def bench(label: str, reps: int) -> list[Run]:
         for text in CORPUS:
             try:
                 ttfa, total, audio_ms = run(text)
-                runs.append(Run(label, model_id, "tts-local", text, True, ttfa,
-                                extra={"total_ms": round(total, 1),
-                                       "audio_ms": round(audio_ms, 1),
-                                       "rtf": round(total / audio_ms, 3) if audio_ms else None}))
+                runs.append(
+                    Run(
+                        label,
+                        model_id,
+                        "tts-local",
+                        text,
+                        True,
+                        ttfa,
+                        extra={
+                            "total_ms": round(total, 1),
+                            "audio_ms": round(audio_ms, 1),
+                            "rtf": round(total / audio_ms, 3) if audio_ms else None,
+                        },
+                    )
+                )
             except Exception as e:
                 runs.append(Run(label, model_id, "tts-local", text, True, None, error=str(e)[:160]))
     ok = [r for r in runs if r.value_ms is not None]
     s = summarize([r.value_ms for r in ok])
     rtf = summarize([r.extra["rtf"] for r in ok if r.extra.get("rtf")])
-    print(f"{label:<16} load={load_s:5.1f}s  ttfa p50={s.get('p50')} p90={s.get('p90')} ms  "
-          f"rtf p50={rtf.get('p50')}  errors={len(runs) - len(ok)}")
+    print(
+        f"{label:<16} load={load_s:5.1f}s  ttfa p50={s.get('p50')} p90={s.get('p90')} ms  "
+        f"rtf p50={rtf.get('p50')}  errors={len(runs) - len(ok)}"
+    )
     return runs
 
 

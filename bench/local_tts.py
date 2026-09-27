@@ -38,6 +38,10 @@ MODELS = {
     "pocket-mlx": ("mlx", "kyutai/pocket-tts", None, {}),
     "qwen3tts-mlx": ("mlx", "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16", None, {}),
     "moss-nano-mlx": ("mlx", "mlx-community/MOSS-TTS-Nano-100M", None, {"stream": False}),
+    # CC BY-NC 4.0: measurable here, not deployable in a product without a licence.
+    "voxtral-mlx": ("mlx", "mlx-community/Voxtral-4B-TTS-2603-mlx-bf16", "casual_male", {}),
+    # Apache-2.0, 2B, 30 languages (OpenBMB, 2026-04).
+    "voxcpm2-mlx": ("mlx", "mlx-community/VoxCPM2-8bit", None, {}),
     "piper-cpu": ("piper", "en_US-lessac-medium", None, {}),
 }
 

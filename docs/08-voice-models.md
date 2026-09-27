@@ -97,8 +97,24 @@ ordering is sound; rerun on a quiet machine before quoting a number.
 | Piper lessac-medium | CPU | 254–284 ms | 620–810 ms | 0.2 | the GPU-less option |
 | Qwen3-TTS 0.6B | Metal | 1,215 ms | ~1,600 ms | 0.8 | too slow |
 | Soprano-80M | Metal | unstable | | | produced 22 s of audio for five words |
-| Pocket TTS (Kyutai) | | | | | gated on Hugging Face: accept its terms to test |
+| Pocket TTS (Kyutai) | | | | | gated; access granted, but the local token lacks gated-repo read scope |
 | MOSS-TTS-Nano | | | | | needs a reference voice clip |
+
+Two larger open models were measured later, when the load average had
+climbed past 100, so only their ratio to Kokoro **in the same run** means
+anything:
+
+| Model | Licence | First audio vs Kokoro, same run | Real-time factor | Vendor figure (their hardware) |
+|---|---|---|---|---|
+| Voxtral 4B TTS 2603 (Mistral) | **CC BY-NC 4.0** | 9.1× slower (8.7 s vs 0.96 s) | 4.5, slower than real time | 70 ms at concurrency 1 on an H200 (vLLM-Omni) |
+| VoxCPM2 2B (OpenBMB) | Apache-2.0 | 7.7× slower (8.2 s vs 1.07 s) | 1.9, slower than real time | RTF 0.3 on an RTX 4090, 0.13 with Nano-vLLM; no first-audio figure |
+
+Neither is a laptop model: both are built to be served by vLLM on a data
+centre GPU, and Metal cannot show what they do there. Voxtral's licence also
+rules out self-hosting it in a product without a separate licence from
+Mistral (its hosted API is the commercial route, served from the EU).
+VoxCPM2 is the one to measure on a Singapore GPU if voice cloning or its 30
+languages matter.
 
 Kokoro through Kokoro-FastAPI in Docker (what compose runs today) measured
 tens of seconds on this machine, because another container was using 250% of

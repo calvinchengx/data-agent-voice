@@ -33,7 +33,7 @@ export default defineConfig({
         },
         {
           label: 'Using it',
-          items: [{ slug: '04-tiers' }, { slug: '03-latency' }],
+          items: [{ slug: '04-tiers' }, { slug: '03-latency' }, { slug: '08-voice-models' }],
         },
         {
           label: 'Proving it',

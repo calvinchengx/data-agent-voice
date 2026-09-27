@@ -12,5 +12,6 @@
 - [TEN, as it actually is at 0.11.71](https://calvinchengx.github.io/data-agent-voice/docs/05-ten/): Read from the tag, not the marketing. Every row names the file it came from, so a claim here can be re-checked when the pin moves.
 - [What is checked, and what that is worth](https://calvinchengx.github.io/data-agent-voice/docs/06-witnesses/): 159 checks run on every push. None of them can tell you the line works — only a call does that, and parity.md keeps those rows red.
 - [What CI runs, and when](https://calvinchengx.github.io/data-agent-voice/docs/07-ci/): Two workflows, and a deliberate asymmetry between them: the checks that are cheap always run; the ones that cost minutes run only when something they could…
+- [Voice models](https://calvinchengx.github.io/data-agent-voice/docs/08-voice-models/): Which speech models can hit 100–200 ms, per stage and end to end, for a caller in Singapore.
 - [Parity — what is witnessed, and where](https://calvinchengx.github.io/data-agent-voice/docs/parity/): Two columns, because they are different claims. Witnessed locally means a check in this repo runs and passes; the check is named, so a green row can always…
 - [Upstream issues](https://calvinchengx.github.io/data-agent-voice/docs/upstream-issues/): Suspected bugs and rough edges in dependencies, written up rather than worked around silently.

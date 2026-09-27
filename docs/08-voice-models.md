@@ -186,6 +186,27 @@ Per call-hour: a 60-minute call with STT billed on all 60 minutes streamed,
 | Deepgram Flux + Aura-2 | $0.39/h | $30/1M chars, US/EU/AU only | $0.84 |
 | Self-hosted in Singapore | Nemotron/Parakeet | Kokoro | ~$0.10 per stream-hour at utilisation |
 
+Estimated latency per stack, assuming the TEN server runs in Singapore. These
+are sums of the stage figures above, not end-to-end measurements. "Reply"
+assumes the host's prompt prefix is cached (planned, not yet in the vendored
+extension); uncached adds 200-300 ms. The first audible thing is a
+pre-rendered acknowledgement played as soon as the turn ends.
+
+| Stack | STT + end of turn | TTS first audio | First audio heard | First spoken reply |
+|---|---|---|---|---|
+| Soniox + ElevenLabs Flash | 250-350 ms | **120-200 ms** | 310-470 ms | 680-1,170 ms |
+| Soniox + Inworld Flash | 250-350 ms | 100-300 ms | 310-470 ms | 660-1,270 ms |
+| Soniox + Soniox TTS | 250-350 ms | 200-300 ms | 310-470 ms | 760-1,270 ms |
+| Deepgram Flux + Aura-2 | 450-550 ms | 500-550 ms | 510-670 ms | 1,260-1,720 ms |
+| Self-hosted Singapore | 250-500 ms | **50-150 ms** | 310-620 ms | 610-1,270 ms |
+| Today (laptop defaults) | 800-1,400 ms | 500-750 ms | 860-1,520 ms | 1,610-2,770 ms |
+
+Fixed stages in every row: audio in 20-40 ms, host first token 200-400 ms
+(cached), first clause 50-100 ms, playback 40-80 ms. The host is the largest
+fixed cost once end of turn is fast; the 100-200 ms target is met by the TTS
+stage on ElevenLabs and self-hosted Kokoro, and by no STT stage, because end
+of turn always includes some listening for silence.
+
 Speech-to-speech for comparison: Gemini Live about $0.42-0.57, OpenAI
 gpt-realtime about $2.05 (mini $0.76), Ultravox $3.00, ElevenLabs Agents
 $4.80 plus the LLM.

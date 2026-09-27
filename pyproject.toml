@@ -10,6 +10,13 @@ dev = [
   "pytest>=8",
   "ruff>=0.16",
 ]
+# The latency benchmarks under bench/. Kept out of `dev` so the CI quality job
+# does not install network clients it never uses.
+bench = [
+  "httpx>=0.28",
+  "websockets>=15",
+  "numpy>=2",
+]
 
 [tool.ruff]
 line-length = 100

@@ -12,3 +12,4 @@ dist/
 .coverage
 website/src/content/docs/
 website/.astro/
+bench/results/

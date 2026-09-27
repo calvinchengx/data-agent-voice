@@ -86,7 +86,7 @@ Measured from Singapore by `bench/tts.py`: **pending keys** (see below).
 `bench/local_tts.py`, in-process on an Apple M4 Max, no network. Time to the
 first audio chunk, three passes over the corpus.
 
-**Provisional:** the machine was carrying a load average of 31–41 on 14 cores
+**Provisional (measured 2026-09-27):** the machine was carrying a load average of 31–41 on 14 cores
 from unrelated work while these ran, so absolute values are inflated. The
 ordering is sound; rerun on a quiet machine before quoting a number.
 
@@ -219,6 +219,55 @@ concurrent calls around the clock.
 
 The full table, with latency bars, quality, regions and TEN extensions per
 option: https://claude.ai/artifact/UcvVR8mFgEUXtN2575CejT
+
+## Why Soniox ranks first for STT
+
+Soniox is a specialist speech-recognition vendor, smaller and less known than
+Deepgram or AssemblyAI, that leads or nearly leads the independent latency
+boards. Four things put it first here:
+
+* **It processes in Japan.** It runs in-region processing in the US, EU,
+  India and Japan (`stt-rt.jp.soniox.com`), the only STT vendor in this
+  comparison with documented processing near Singapore.
+* **It decides end of turn from the words.** An `<end>` token marks the end of
+  the caller's turn, judged on content rather than a fixed silence, which
+  removes the 500-800 ms wait that dominates today's budget.
+* **It is fast and cheap.** 55 ms to the final transcript once asked (3rd of
+  27 on Coval), about 250-260 ms from end of speech (Pipecat), 5.3% WER, and
+  $0.12 per hour streamed, the lowest list price here.
+* **TEN supports it already.** `soniox_asr_python` exists at 0.11.71, so the
+  switch is graph configuration.
+
+Its Japan hostname answers from a Cloudflare edge in Singapore that shares an
+address with its global hostname, so where audio is processed is Soniox's
+statement, not something measured here. A real request settles the latency;
+its retention terms need reading before governed-data audio goes to it.
+
+## Why ElevenLabs alone is likely slower
+
+Using ElevenLabs for both stages saves no time: the stages run one after the
+other through the TEN server over separate connections whichever vendors they
+are, and the TTS stage is the same (Flash v2.5) either way. The difference is
+Scribe v2 Realtime against Soniox, and it comes down to end of turn. Scribe
+commits a transcript after a stretch of silence (voice activity detection);
+Soniox judges end of turn from the words. Scribe finalizes quickly once it
+commits (130 ms on Coval), but it has to wait out that silence first, and its
+Singapore routing is documented for TTS, not STT.
+
+| Stack | STT + end of turn | TTS | First audio heard | First spoken reply | Per call-hour |
+|---|---|---|---|---|---|
+| Soniox + ElevenLabs Flash | 250-350 ms | 120-200 ms | 310-470 ms | 680-1,170 ms | $0.84 |
+| ElevenLabs only (Scribe + Flash) | ~450-700 ms | 120-200 ms | ~510-820 ms | ~880-1,520 ms | $1.11 |
+
+Estimates, assuming a 300-500 ms silence commit; a shorter commit is faster
+and cuts callers off when they pause. ElevenLabs-only wins on having one
+contract, one data-processing agreement and one Singapore residency deal, and
+a separate turn detector on a GPU would close most of the gap. ElevenLabs
+Agents, which runs the whole loop inside ElevenLabs, speaks fixed refusals
+verbatim only in custom-LLM mode, costs $4.80 per call-hour plus the LLM, and
+has a reported p50 of about 680 ms from a secondary source. `bench/stt.py`
+measures Scribe and Soniox side by side on the same fixtures once both keys
+are set.
 
 ## What to deploy
 

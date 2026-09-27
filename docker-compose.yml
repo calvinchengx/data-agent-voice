@@ -80,7 +80,7 @@ services:
   # profile and CI never starts it. DAV_EOU_MODE=fixed is the default.
   turn-detection:
     profiles: [semantic]
-    image: vllm/vllm-openai:${VLLM_VERSION:-v0.27.1}
+    image: mirror.gcr.io/vllm/vllm-openai:${VLLM_VERSION:-v0.27.1}
     command:
       - --model
       - ${TURN_DETECTION_MODEL:-TEN-framework/TEN_Turn_Detection}

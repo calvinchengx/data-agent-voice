@@ -29,7 +29,7 @@ ARG TEN_BUILD_IMAGE_VERSION=0.7.14
 # Cloned rather than vendored into this repo: the tag IS the pin, a clone is
 # reviewable by diffing against it, and only PATCHED extensions need to live
 # in this repo (extensions/vendor/, docs/05-ten.md §7).
-FROM alpine/git:2.45.2 AS ten-src
+FROM mirror.gcr.io/alpine/git:2.45.2 AS ten-src
 ARG TEN_VERSION
 WORKDIR /src
 RUN git clone --depth 1 --branch ${TEN_VERSION} \
@@ -51,7 +51,7 @@ ENV PIP_FLAGS=""
 # 24.04, not 22.04: the arm64 `tman` in the release is linked against glibc
 # 2.38/2.39 and 22.04 ships 2.35, so it will not start at all. The amd64 leg
 # keeps TEN's own 22.04-based image, which is what upstream tests.
-FROM ubuntu:24.04 AS builder-arm64
+FROM mirror.gcr.io/library/ubuntu:24.04 AS builder-arm64
 ARG TEN_VERSION
 ENV TEN_ARCH_SOURCE=release
 ENV PIP_FLAGS="--break-system-packages"
@@ -164,7 +164,7 @@ RUN tman package --output-path /tmp/app.tar 2>/dev/null || true
 # Also 24.04, for the same reason on the arm64 leg -- the runtime libraries in
 # the release need it. amd64 binaries built on 22.04 run here unchanged, glibc
 # being backward compatible; the reverse is what fails.
-FROM ubuntu:24.04
+FROM mirror.gcr.io/library/ubuntu:24.04
 ARG TEN_VERSION
 LABEL org.opencontainers.image.title="data-agent-voice / analyst-line" \
       org.opencontainers.image.description="TEN graph for the Analyst Line: WebSocket in, local ASR/TTS, Claude host, the ask service behind it" \

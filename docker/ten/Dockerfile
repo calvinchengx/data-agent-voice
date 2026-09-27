@@ -103,6 +103,13 @@ COPY extensions/            agents/ten_packages/extension/
 COPY tenapp/                agents/analyst_line/tenapp/
 
 WORKDIR /app/agents/analyst_line/tenapp
+# The runtime is pinned EXACTLY in the manifests (`=0.11.71`), not as `0.11`.
+# A range let tman plan to replace the aarch64 runtime placed below with the
+# registry's newer x64-only one (0.11.73 on 2026-09-27), and it then installed
+# nothing at all, so the next step found no extensions. The pin has to move
+# with TEN_VERSION, and this fails the build if it does not.
+RUN grep -q "\"=${TEN_VERSION}\"" manifest.json \
+ || { echo "tenapp/manifest.json does not pin the runtime to =${TEN_VERSION}" >&2; exit 1; }
 RUN set -eux; \
     if [ "$TEN_ARCH_SOURCE" = "release" ]; then \
       # The registry has no aarch64 runtime; place it, then let tman resolve

@@ -10,13 +10,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.scripts.json"
   },
   "dependencies": {
-    "@astrojs/starlight": "0.42.0",
-    "astro": "7.2.8",
-    "sharp": "0.35.4"
+    "@astrojs/starlight": "0.42.6",
+    "astro": "7.4.0",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
-    "@types/node": "22.15.3",
-    "tsx": "4.20.6",
-    "typescript": "5.9.3"
+    "@types/node": "26.6.5",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
   }
 }

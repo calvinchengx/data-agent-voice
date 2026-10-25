@@ -32,7 +32,7 @@ jobs:
     outputs:
       code: ${{ steps.what.outputs.code }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - id: what
@@ -56,14 +56,14 @@ jobs:
     name: Lint, and the configuration held to itself
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
       - run: uv python install 3.12
       # The panel's arithmetic is JavaScript and is exercised by the same
       # suite; without node those checks skip visibly rather than pass.
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
 
@@ -115,7 +115,7 @@ jobs:
             platform: linux/arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Skipped, visibly, until every extension the graph names exists: the
       # build cannot succeed without them, and a job that is red on every push
       # teaches people to stop reading CI. It starts building by itself the
@@ -134,10 +134,10 @@ jobs:
             echo "::notice title=Image not built::$reason — the graph names extensions this repository has not written yet. See docs/parity.md."
           fi
       - if: steps.ready.outputs.build == 'true'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - name: Build
         if: steps.ready.outputs.build == 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: docker/ten/Dockerfile
